@@ -17,6 +17,9 @@ namespace Lab1
         private FormBorderStyle lastStyle;
         private FormWindowState lastState;
 
+        // НОВОЕ: Ссылка на текущее открытое окно редактора
+        private EditorForm currentEditor = null;
+
         public Form1()
         {
             InitializeComponent();
@@ -86,7 +89,7 @@ namespace Lab1
                 fig.Draw(e.Graphics);
             }
 
-            // ОТОБРАЖЕНИЕ ВИРТУАЛЬНЫХ ГРАНИЦ (Оставляем как было)
+            // ОТОБРАЖЕНИЕ ВИРТУАЛЬНЫХ ГРАНИЦ
             if (selectedFigure != null)
             {
                 // 1. Точка привязки
@@ -121,9 +124,11 @@ namespace Lab1
                     }
                     else if (e.Button == MouseButtons.Right)
                     {
-                        // ВЫЗОВ МЕНЮ РЕДАКТИРОВАНИЯ ПО ПКМ
-                        EditorForm editor = new EditorForm(selectedFigure, this, canvasPanel);
-                        editor.Show(); // Открываем как отдельное окно
+                        // ИЗМЕНЕНО: Закрываем старое окно, если оно есть, и сохраняем ссылку на новое
+                        if (currentEditor != null && !currentEditor.IsDisposed) currentEditor.Close();
+
+                        currentEditor = new EditorForm(selectedFigure, this, canvasPanel);
+                        currentEditor.Show();
                     }
                     break;
                 }
@@ -140,6 +145,12 @@ namespace Lab1
                 selectedFigure.Move(e.X - lastMousePos.X, e.Y - lastMousePos.Y);
                 lastMousePos = e.Location;
                 canvasPanel.Invalidate();
+
+                // ИЗМЕНЕНО: Обновляем координаты в открытом окне редактора при перетаскивании
+                if (currentEditor != null && !currentEditor.IsDisposed)
+                {
+                    currentEditor.UpdateCoordinates();
+                }
             }
         }
     }
