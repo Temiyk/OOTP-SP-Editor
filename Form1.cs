@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
 using Lab1.Shapes;
+using System.Linq;
 
 namespace Lab1
 {
@@ -14,10 +15,8 @@ namespace Lab1
         private bool isFullScreen = false;
         private FormBorderStyle lastStyle;
         private FormWindowState lastState;
-        public List<Figure> selectedFigures = new List<Figure>(); // Вместо одиночного selectedFigure
-        private bool isSelecting = false;
-        private Point selectionStart;
-        private Rectangle selectionRect;
+
+        public List<Figure> selectedFigures = new List<Figure>();
 
         private EditorForm currentEditor = null;
         private FiguresListForm listForm = null;
@@ -32,7 +31,6 @@ namespace Lab1
         {
             InitializeComponent();
 
-            // Настраиваем события для новых кнопок на тулбаре
             btnToggleDraw.Click += (s, e) => {
                 isDrawingMode = !isDrawingMode;
                 btnToggleDraw.Text = isDrawingMode ? "Рисование (Вкл)" : "Рисование (Выкл)";
@@ -54,7 +52,7 @@ namespace Lab1
                 RefreshCanvas();
             };
             btnFullScreen.Click += (s, e) => ToggleFullScreen();
-            this.KeyDown += (s, e) => { 
+            this.KeyDown += (s, e) => {
                 if (e.KeyCode == Keys.F11) ToggleFullScreen();
                 if (e.Control && e.KeyCode == Keys.G) GroupAndSaveTemplate();
             };
@@ -62,7 +60,12 @@ namespace Lab1
             canvasPanel.Paint += CanvasPanel_Paint;
             canvasPanel.MouseDown += CanvasPanel_MouseDown;
             canvasPanel.MouseMove += CanvasPanel_MouseMove;
-            canvasPanel.MouseUp += (s, e) => isDragging = false;
+
+            // Сбрасываем флаг перетаскивания при отпускании любой кнопки мыши
+            canvasPanel.MouseUp += (s, e) => {
+                isDragging = false;
+                RefreshCanvas();
+            };
         }
 
         public void UpdateListForm()
@@ -106,11 +109,12 @@ namespace Lab1
             selectedFigures.Add(newGroup);
 
             customTemplates.Add(templateName, newGroup);
-            if (!cbShapeType.Items.Contains(templateName)) // Проверка, чтобы не дублировать в списке
+            if (!cbShapeType.Items.Contains(templateName))
                 cbShapeType.Items.Add(templateName);
 
             RefreshCanvas();
         }
+
         private void CreateFigureFromUI()
         {
             Point center = new Point(canvasPanel.Width / 2, canvasPanel.Height / 2);
@@ -125,12 +129,9 @@ namespace Lab1
                 case "Трапеция": f = CustomPolygon.CreateTrapezium(center); break;
                 case "Пятиугольник": f = CustomPolygon.CreatePentagon(center); break;
                 default:
-                   
                     if (selectedType != null && customTemplates.ContainsKey(selectedType))
                     {
-                        
                         f = customTemplates[selectedType].Clone();
-                        
                         f.BaseLocation = center;
                     }
                     break;
@@ -150,119 +151,69 @@ namespace Lab1
         {
             e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
 
-            foreach (var fig in figures)
-            {
-                fig.Draw(e.Graphics);
-            }
+            foreach (var fig in figures) fig.Draw(e.Graphics);
 
-            // Отрисовка процесса рисования линии
             if (isDrawingMode)
             {
                 if (tempPoints.Count > 1)
                 {
                     e.Graphics.DrawLines(Pens.Gray, tempPoints.ToArray());
 
-                    // ИСПРАВЛЕНИЕ 2: Отрисовка угла между точками
                     for (int i = 1; i < tempPoints.Count; i++)
                     {
                         Point p1 = tempPoints[i - 1];
                         Point p2 = tempPoints[i];
 
-                        // Вычисляем угол в радианах, переводим в градусы
-                        double angleRad = Math.Atan2(p2.Y - p1.Y, p2.X - p1.X);
-                        double angleDeg = angleRad * 180.0 / Math.PI;
-                        if (angleDeg < 0) angleDeg += 360; // Делаем угол положительным (0-360)
+                        // Расчет угла
+                        double angleDeg = Math.Atan2(p2.Y - p1.Y, p2.X - p1.X) * 180.0 / Math.PI;
+                        if (angleDeg < 0) angleDeg += 360;
 
-                        string text = $"{Math.Round(angleDeg)}°";
+                        // --- НОВОЕ: Расчет длины сегмента ---
+                        double length = Math.Sqrt(Math.Pow(p2.X - p1.X, 2) + Math.Pow(p2.Y - p1.Y, 2));
 
-                        // Находим середину отрезка, чтобы разместить там текст
+                        string text = $"{Math.Round(angleDeg)}° | L: {Math.Round(length)}px";
                         PointF mid = new PointF((p1.X + p2.X) / 2f + 5, (p1.Y + p2.Y) / 2f - 15);
-                        e.Graphics.DrawString(text, new Font("Segoe UI", 10, FontStyle.Bold), Brushes.Blue, mid);
+                        e.Graphics.DrawString(text, new Font("Segoe UI", 9, FontStyle.Bold), Brushes.Blue, mid);
                     }
                 }
-                foreach (var p in tempPoints) e.Graphics.FillRectangle(Brushes.Red, p.X - 2, p.Y - 2, 4, 4);
-            }
 
-            
-            if (!isDrawingMode)
-            {
-                foreach (var fig in selectedFigures)
+                // Отрисовка "резиновой нити" от последней точки до курсора
+                if (tempPoints.Count > 0)
                 {
-                    using (Pen p = new Pen(Color.Red, 1) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash })
-                        e.Graphics.DrawEllipse(p, fig.BaseLocation.X - 5, fig.BaseLocation.Y - 5, 10, 10);
+                    Point lastPoint = tempPoints[tempPoints.Count - 1];
+                    using (Pen guidePen = new Pen(Color.Gray, 1) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash })
+                    {
+                        e.Graphics.DrawLine(guidePen, lastPoint, currentMousePos);
+                    }
 
-                    RectangleF bounds = fig.GetBounds();
-                    using (Pen borderPen = new Pen(Color.Red, 1))
-                        e.Graphics.DrawRectangle(borderPen, bounds.X - 5, bounds.Y - 5, bounds.Width + 10, bounds.Height + 10);
+                    double dx = currentMousePos.X - lastPoint.X;
+                    double dy = currentMousePos.Y - lastPoint.Y;
+
+                    // --- НОВОЕ: Длина и угол для динамической линии ---
+                    double angle = Math.Atan2(dy, dx) * (180.0 / Math.PI);
+                    if (angle < 0) angle += 360;
+                    double dist = Math.Sqrt(dx * dx + dy * dy);
+
+                    string infoText = $"{Math.Round(angle, 1)}°\nL: {Math.Round(dist)}px";
+                    e.Graphics.DrawString(infoText, new Font("Segoe UI", 9, FontStyle.Bold), Brushes.DarkBlue,
+                                         currentMousePos.X + 15, currentMousePos.Y + 15);
                 }
             }
-
-            if (isDrawingMode && tempPoints.Count > 0)
+            else
             {
-                Point lastPoint = tempPoints[tempPoints.Count - 1];
-
-                // Рисуем направляющую линию до курсора (пунктиром)
-                using (Pen guidePen = new Pen(Color.Gray, 1) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash })
+                // Отрисовка строгих границ (без отступов, единая логика)
+                using (Pen selectPen = new Pen(Color.Orange, 2) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash })
                 {
-                    e.Graphics.DrawLine(guidePen, lastPoint, currentMousePos);
-                }
+                    foreach (var fig in selectedFigures)
+                    {
+                        var bounds = fig.GetBounds();
+                        // Строго по виртуальным границам фигуры
+                        e.Graphics.DrawRectangle(selectPen, bounds.X, bounds.Y, bounds.Width, bounds.Height);
 
-                // Вычисляем угол с помощью арктангенса
-                double dx = currentMousePos.X - lastPoint.X;
-                double dy = currentMousePos.Y - lastPoint.Y;
-                double angleInDegrees = Math.Atan2(dy, dx) * (180.0 / Math.PI);
-
-                // Приводим угол к понятному диапазону 0-360 градусов
-                if (angleInDegrees < 0) angleInDegrees += 360;
-
-                // Форматируем текст (округляем до 1 знака после запятой)
-                string angleText = $"{Math.Round(angleInDegrees, 1)}°";
-
-                // Отрисовываем текст рядом с курсором с красивой подложкой для читаемости
-                PointF textPos = new PointF(currentMousePos.X + 15, currentMousePos.Y + 15);
-                SizeF textSize = e.Graphics.MeasureString(angleText, this.Font);
-
-                // Полупрозрачный белый фон под текст
-                using (SolidBrush bgBrush = new SolidBrush(Color.FromArgb(200, 255, 255, 255)))
-                {
-                    e.Graphics.FillRectangle(bgBrush, textPos.X, textPos.Y, textSize.Width, textSize.Height);
-                }
-
-                e.Graphics.DrawString(angleText, new Font("Segoe UI", 10, FontStyle.Bold), Brushes.DarkBlue, textPos);
-            }
-
-            if (isSelecting)
-            {
-                // Полупрозрачный синий фон
-                using (SolidBrush selectionBrush = new SolidBrush(Color.FromArgb(50, Color.DodgerBlue)))
-                {
-                    e.Graphics.FillRectangle(selectionBrush, selectionRect);
-                }
-
-                // Синяя пунктирная граница
-                using (Pen selectionPen = new Pen(Color.DodgerBlue, 1) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash })
-                {
-                    e.Graphics.DrawRectangle(selectionPen, selectionRect);
-                }
-            }
-            using (Pen selectPen = new Pen(Color.Orange, 2) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash })
-            {
-                foreach (var fig in selectedFigures)
-                {
-                    var bounds = fig.GetBounds();
-                    // Рисуем чуть расширенную рамку вокруг фигуры
-                    e.Graphics.DrawRectangle(selectPen, bounds.X - 2, bounds.Y - 2, bounds.Width + 4, bounds.Height + 4);
-                }
-            }
-
-            // Рисуем общую рамку выделения (когда тянем мышью)
-            if (isSelecting)
-            {
-                using (Pen p = new Pen(Color.DodgerBlue, 1) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash })
-                using (SolidBrush b = new SolidBrush(Color.FromArgb(50, Color.LightSkyBlue)))
-                {
-                    e.Graphics.FillRectangle(b, selectionRect);
-                    e.Graphics.DrawRectangle(p, selectionRect);
+                        // Точка центра фигуры (опционально для удобства)
+                        using (Pen p = new Pen(Color.Red, 1) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash })
+                            e.Graphics.DrawEllipse(p, fig.BaseLocation.X - 5, fig.BaseLocation.Y - 5, 10, 10);
+                    }
                 }
             }
         }
@@ -296,7 +247,6 @@ namespace Lab1
             bool hit = false;
             bool isMultiSelect = (Control.ModifierKeys & Keys.Control) == Keys.Control;
 
-            // 1. Проверяем попадание в фигуры (с конца списка, чтобы брать верхние)
             for (int i = figures.Count - 1; i >= 0; i--)
             {
                 if (figures[i].Contains(e.Location))
@@ -310,18 +260,36 @@ namespace Lab1
                     if (!selectedFigures.Contains(figures[i]))
                         selectedFigures.Add(figures[i]);
 
-                    isDragging = true;
+                    // Перетаскиваем только если зажата левая кнопка мыши
+                    if (e.Button == MouseButtons.Left)
+                    {
+                        isDragging = true;
+                    }
+
+                    // Если кликнули ПКМ, открываем окно свойств
+                    if (e.Button == MouseButtons.Right)
+                    {
+                        // Если выделено несколько фигур, но мы кликнули ПКМ по одной из них,
+                        // логично открыть редактор именно для той, по которой кликнули.
+                        // Поэтому мы сбрасываем выделение и оставляем только её (если не зажат Ctrl).
+                        if (!isMultiSelect)
+                        {
+                            selectedFigures.Clear();
+                            selectedFigures.Add(figures[i]);
+                        }
+
+                        if (currentEditor != null && !currentEditor.IsDisposed) currentEditor.Close();
+                        currentEditor = new EditorForm(figures[i], this, canvasPanel);
+                        currentEditor.Show();
+                    }
                     break;
                 }
             }
 
-            // 2. Если кликнули в пустоту — начинаем выделение рамкой
-            if (!hit)
+            // Если кликнули в пустоту — просто сбрасываем выделение
+            if (!hit && !isMultiSelect)
             {
-                if (!isMultiSelect) selectedFigures.Clear();
-                isSelecting = true;
-                selectionStart = e.Location;
-                selectionRect = new Rectangle(e.Location, new Size(0, 0));
+                selectedFigures.Clear();
             }
 
             RefreshCanvas();
@@ -329,45 +297,19 @@ namespace Lab1
 
         private void CanvasPanel_MouseMove(object sender, MouseEventArgs e)
         {
-            currentMousePos = e.Location; // Важно для отрисовки угла
+            currentMousePos = e.Location;
 
-            if (isDragging)
+            if (isDragging && e.Button == MouseButtons.Left)
             {
                 int dx = e.X - lastMousePos.X;
                 int dy = e.Y - lastMousePos.Y;
                 foreach (var fig in selectedFigures) fig.Move(dx, dy);
                 lastMousePos = e.Location;
-            }
-            else if (isSelecting)
-            {
-                // Формируем прямоугольник так, чтобы его можно было тянуть в любую сторону
-                selectionRect = new Rectangle(
-                    Math.Min(selectionStart.X, e.X),
-                    Math.Min(selectionStart.Y, e.Y),
-                    Math.Abs(selectionStart.X - e.X),
-                    Math.Abs(selectionStart.Y - e.Y));
+
+                // Обновляем координаты в редакторе, если он открыт
+                if (currentEditor != null && !currentEditor.IsDisposed) currentEditor.UpdateCoordinates();
             }
 
-            RefreshCanvas();
-        }
-
-        private void CanvasPanel_MouseUp(object sender, MouseEventArgs e)
-        {
-            if (isSelecting)
-            {
-                // Финальный расчет выделенных фигур
-                foreach (var fig in figures)
-                {
-                    if (selectionRect.IntersectsWith(Rectangle.Round(fig.GetBounds())))
-                    {
-                        if (!selectedFigures.Contains(fig)) selectedFigures.Add(fig);
-                    }
-                }
-            }
-
-            isDragging = false;
-            isSelecting = false; // СБРОС СОСТОЯНИЯ
-            selectionRect = new Rectangle(0, 0, 0, 0);
             RefreshCanvas();
         }
     }

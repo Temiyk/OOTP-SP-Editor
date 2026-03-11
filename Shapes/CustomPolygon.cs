@@ -72,7 +72,8 @@ namespace Lab1.Shapes
             float maxX = vertices.Max(v => v.X);
             float maxY = vertices.Max(v => v.Y);
 
-            float padding = (MaxThickness / 2f) + 15f;
+            // ИСПРАВЛЕНИЕ: Оставляем только толщину самой линии, без искусственных +15
+            float padding = MaxThickness / 2f;
             return new RectangleF(minX - padding, minY - padding, (maxX - minX) + padding * 2, (maxY - minY) + padding * 2);
         }
 
@@ -135,6 +136,15 @@ namespace Lab1.Shapes
                 PointF[] quad = { outer[i], outer[next], inner[next], inner[i] };
                 using (var brush = new SolidBrush(Sides[i].Color))
                     g.FillPolygon(brush, quad);
+
+                // ИСПРАВЛЕНИЕ 3: Подсветка выбранной стороны в редакторе
+                if (Sides[i] == HighlightedSide)
+                {
+                    using (Pen highlight = new Pen(Color.Cyan, 3) { DashStyle = DashStyle.Dash })
+                    {
+                        g.DrawPolygon(highlight, quad);
+                    }
+                }
             }
         }
 
@@ -163,6 +173,7 @@ namespace Lab1.Shapes
             }
             return res;
         }
+
         public override Figure Clone()
         {
             CustomPolygon clone = new CustomPolygon(new Point(this.BaseLocation.X, this.BaseLocation.Y), this.Name);

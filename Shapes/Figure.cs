@@ -11,7 +11,7 @@ namespace Lab1.Shapes
         public int Size { get; set; } = 100;
         public Point BaseLocation { get; set; }
         public PointF RelativePivot { get; set; } = new PointF(0, 0);
-
+        public SideStyle HighlightedSide { get; set; } = null;
         public Point Center
         {
             get => new Point(

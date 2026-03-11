@@ -15,10 +15,10 @@ namespace Lab1
         private Label lblBounds;
         private TextBox txtFigureName;
         private TextBox txtCX, txtCY, txtRelX, txtRelY, txtScale, txtThick, txtSideRelX, txtSideRelY;
+        private TextBox txtSideLength;
         private Panel pnlFillColor, pnlSideColor;
         private ComboBox cbSides;
 
-        // ИСПРАВЛЕНИЕ 3: Плоский список для хранения сторон даже из вложенных групп
         private List<SideStyle> flatSides = new List<SideStyle>();
 
         public EditorForm(Figure figure, Form1 main, Panel canvasPanel)
@@ -29,6 +29,13 @@ namespace Lab1
 
             InitializeUI();
             LoadData();
+
+            // Сбрасываем выделение стороны при закрытии редактора
+            this.FormClosed += (s, e) =>
+            {
+                if (targetFigure != null) targetFigure.HighlightedSide = null;
+                mainForm.RefreshCanvas();
+            };
         }
 
         private void InitializeUI()
@@ -88,6 +95,9 @@ namespace Lab1
             txtSideRelX = AddTextBox(ref y, elementWidth);
             txtSideRelY = AddTextBox(ref y, elementWidth);
 
+            AddLabel("Длина стороны (px):", ref y);
+            txtSideLength = AddTextBox(ref y, elementWidth);
+
             Button btnApply = new Button { Text = "Применить", Location = new Point(10, y), Size = new Size(elementWidth, 45), BackColor = Color.LightGreen };
             btnApply.Click += ApplyChanges;
             this.Controls.Add(btnApply); y += 55;
@@ -96,7 +106,7 @@ namespace Lab1
             btnDel.Click += (s, e) =>
             {
                 mainForm.figures.Remove(targetFigure);
-                mainForm.selectedFigures.Remove(targetFigure); // Исправлено: удаляем из списка выделенных
+                mainForm.selectedFigures.Remove(targetFigure);
                 mainForm.RefreshCanvas();
                 mainForm.UpdateListForm();
                 this.Close();
@@ -127,7 +137,6 @@ namespace Lab1
             }
         }
 
-        // ИСПРАВЛЕНИЕ 3: Рекурсивный метод для сбора всех сторон
         private void PopulateSides(Figure f, string prefixName)
         {
             if (f is CompositeFigure comp)
@@ -160,7 +169,6 @@ namespace Lab1
             txtScale.Text = (targetFigure.Size / 100f).ToString();
             pnlFillColor.BackColor = targetFigure.FillColor;
 
-            // ИСПРАВЛЕНИЕ 3: Заполняем список с помощью рекурсивного метода
             cbSides.Items.Clear();
             flatSides.Clear();
             PopulateSides(targetFigure, "");
@@ -181,12 +189,42 @@ namespace Lab1
         {
             if (cbSides.SelectedIndex < 0) return;
 
-            // ИСПРАВЛЕНИЕ 3: Берем сторону из нашего плоского списка
             var side = flatSides[cbSides.SelectedIndex];
+
+            // Устанавливаем сторону для мерцания/выделения и перерисовываем холст
+            targetFigure.HighlightedSide = side;
+            mainForm.RefreshCanvas();
+
             pnlSideColor.BackColor = side.Color;
             txtThick.Text = side.Thickness.ToString();
             txtSideRelX.Text = side.RelativeOffset.X.ToString();
             txtSideRelY.Text = side.RelativeOffset.Y.ToString();
+            Figure parent = FindParentFigure(targetFigure, side);
+            if (parent != null)
+            {
+                int idx = parent.Sides.IndexOf(side);
+                int nextIdx = (idx + 1) % parent.Sides.Count;
+                var nextSide = parent.Sides[nextIdx];
+
+                double dx = nextSide.RelativeOffset.X - side.RelativeOffset.X;
+                double dy = nextSide.RelativeOffset.Y - side.RelativeOffset.Y;
+                double length = Math.Sqrt(dx * dx + dy * dy);
+                txtSideLength.Text = Math.Round(length).ToString();
+            }
+        }
+
+        private Figure FindParentFigure(Figure root, SideStyle side)
+        {
+            if (root.Sides.Contains(side)) return root;
+            if (root is CompositeFigure comp)
+            {
+                foreach (var child in comp.Children)
+                {
+                    var found = FindParentFigure(child, side);
+                    if (found != null) return found;
+                }
+            }
+            return null;
         }
 
         private void ApplyChanges(object sender, EventArgs e)
@@ -208,11 +246,43 @@ namespace Lab1
 
                 if (cbSides.SelectedIndex >= 0)
                 {
-                    // ИСПРАВЛЕНИЕ 3: Применяем изменения к правильной стороне из плоского списка
                     var side = flatSides[cbSides.SelectedIndex];
                     side.Color = pnlSideColor.BackColor;
                     side.Thickness = float.Parse(txtThick.Text);
                     side.RelativeOffset = new PointF(float.Parse(txtSideRelX.Text), float.Parse(txtSideRelY.Text));
+                }
+
+                if (cbSides.SelectedIndex >= 0)
+                {
+                    var side = flatSides[cbSides.SelectedIndex];
+                    side.Color = pnlSideColor.BackColor;
+                    side.Thickness = float.Parse(txtThick.Text);
+                    side.RelativeOffset = new PointF(float.Parse(txtSideRelX.Text), float.Parse(txtSideRelY.Text));
+
+                    // --- НОВОЕ: Изменение длины ---
+                    Figure parent = FindParentFigure(targetFigure, side);
+                    if (parent != null)
+                    {
+                        int idx = parent.Sides.IndexOf(side);
+                        int nextIdx = (idx + 1) % parent.Sides.Count;
+                        var nextSide = parent.Sides[nextIdx];
+
+                        float newLen = float.Parse(txtSideLength.Text);
+
+                        // Вектор текущего направления
+                        float dx = nextSide.RelativeOffset.X - side.RelativeOffset.X;
+                        float dy = nextSide.RelativeOffset.Y - side.RelativeOffset.Y;
+                        double oldLen = Math.Sqrt(dx * dx + dy * dy);
+
+                        if (oldLen > 0.1) // Чтобы не делить на ноль
+                        {
+                            // Новые координаты следующей точки = старт + (направление * новая_длина)
+                            nextSide.RelativeOffset = new PointF(
+                                side.RelativeOffset.X + (float)(dx / oldLen * newLen),
+                                side.RelativeOffset.Y + (float)(dy / oldLen * newLen)
+                            );
+                        }
+                    }
                 }
 
                 LoadData();
