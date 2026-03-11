@@ -6,9 +6,52 @@ using System.Numerics;
 
 namespace Lab1.Shapes
 {
-    public abstract class PolygonBase : Figure
+    public class CustomPolygon : Figure
     {
-        protected PolygonBase(Point center) : base(center) { }
+        public CustomPolygon(Point center, string name = "Произвольная фигура") : base(center)
+        {
+            Name = name;
+        }
+
+        public static CustomPolygon CreateRectangle(Point center)
+        {
+            var f = new CustomPolygon(center, "Прямоугольник");
+            f.Sides.Add(new SideStyle(-50, -50));
+            f.Sides.Add(new SideStyle(50, -50));
+            f.Sides.Add(new SideStyle(50, 50));
+            f.Sides.Add(new SideStyle(-50, 50));
+            return f;
+        }
+
+        public static CustomPolygon CreateTriangle(Point center)
+        {
+            var f = new CustomPolygon(center, "Треугольник");
+            f.Sides.Add(new SideStyle(0, -50));
+            f.Sides.Add(new SideStyle(45, 40));
+            f.Sides.Add(new SideStyle(-45, 40));
+            return f;
+        }
+
+        public static CustomPolygon CreateTrapezium(Point center)
+        {
+            var f = new CustomPolygon(center, "Трапеция");
+            f.Sides.Add(new SideStyle(-30, -30));
+            f.Sides.Add(new SideStyle(30, -30));
+            f.Sides.Add(new SideStyle(60, 30));
+            f.Sides.Add(new SideStyle(-60, 30));
+            return f;
+        }
+
+        public static CustomPolygon CreatePentagon(Point center)
+        {
+            var f = new CustomPolygon(center, "Пятиугольник");
+            for (int i = 0; i < 5; i++)
+            {
+                double angle = -Math.PI / 2 + i * 2 * Math.PI / 5;
+                f.Sides.Add(new SideStyle((int)(60 * Math.Cos(angle)), (int)(60 * Math.Sin(angle))));
+            }
+            return f;
+        }
 
         public PointF[] GetVertices()
         {
@@ -19,7 +62,6 @@ namespace Lab1.Shapes
             )).ToArray();
         }
 
-        // НОВОЕ: Реализация границ для полигонов
         public override RectangleF GetBounds()
         {
             var vertices = GetVertices();
@@ -30,7 +72,6 @@ namespace Lab1.Shapes
             float maxX = vertices.Max(v => v.X);
             float maxY = vertices.Max(v => v.Y);
 
-            // Увеличиваем отступ: половина толщины линии + 15 пикселей запаса
             float padding = (MaxThickness / 2f) + 15f;
             return new RectangleF(minX - padding, minY - padding, (maxX - minX) + padding * 2, (maxY - minY) + padding * 2);
         }
@@ -121,6 +162,12 @@ namespace Lab1.Shapes
                     res = !res;
             }
             return res;
+        }
+        public override Figure Clone()
+        {
+            CustomPolygon clone = new CustomPolygon(new Point(this.BaseLocation.X, this.BaseLocation.Y), this.Name);
+            this.CopyBaseProperties(clone);
+            return clone;
         }
     }
 }

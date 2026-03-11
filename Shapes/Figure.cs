@@ -6,27 +6,23 @@ namespace Lab1.Shapes
 {
     public abstract class Figure
     {
+        public string Name { get; set; } = "Новая фигура";
+
         public int Size { get; set; } = 100;
-
-        // Это абсолютная точка привязки (Anchor) на холсте
         public Point BaseLocation { get; set; }
-
-        // Относительное смещение точки привязки от геометрического центра
         public PointF RelativePivot { get; set; } = new PointF(0, 0);
 
-        // Геометрический (визуальный) центр фигуры. Используется для отрисовки.
         public Point Center
         {
             get => new Point(
-                BaseLocation.X - (int)RelativePivot.X, // ИЗМЕНЕНО: теперь мы вычитаем
-                BaseLocation.Y - (int)RelativePivot.Y  // ИЗМЕНЕНО: теперь мы вычитаем
+                BaseLocation.X - (int)RelativePivot.X,
+                BaseLocation.Y - (int)RelativePivot.Y
             );
             set
             {
-                // Если мы смещаем всю фигуру целиком, точка привязки смещается вместе с ней
                 BaseLocation = new Point(
-                    value.X + (int)RelativePivot.X, // ИЗМЕНЕНО: теперь мы прибавляем
-                    value.Y + (int)RelativePivot.Y  // ИЗМЕНЕНО: теперь мы прибавляем
+                    value.X + (int)RelativePivot.X,
+                    value.Y + (int)RelativePivot.Y
                 );
             }
         }
@@ -43,10 +39,25 @@ namespace Lab1.Shapes
         public abstract void Draw(Graphics g);
         public abstract bool Contains(Point p);
         public abstract RectangleF GetBounds();
-
-        public void Move(int dx, int dy)
+        public abstract Figure Clone();
+        public virtual void Move(int dx, int dy)
         {
             BaseLocation = new Point(BaseLocation.X + dx, BaseLocation.Y + dy);
+        }
+        protected void CopyBaseProperties(Figure clone)
+        {
+            clone.Name = this.Name;
+            clone.Size = this.Size;
+            clone.BaseLocation = new Point(this.BaseLocation.X, this.BaseLocation.Y);
+            clone.RelativePivot = new PointF(this.RelativePivot.X, this.RelativePivot.Y);
+            clone.FillColor = this.FillColor;
+
+            // Глубокое копирование списка сторон
+            clone.Sides = new List<SideStyle>();
+            foreach (var side in this.Sides)
+            {
+                clone.Sides.Add(side.Clone());
+            }
         }
     }
 }

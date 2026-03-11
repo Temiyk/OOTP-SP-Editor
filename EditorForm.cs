@@ -1,6 +1,6 @@
-﻿using Lab1.Figures;
-using Lab1.Shapes;
+﻿using Lab1.Shapes;
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
 
@@ -12,11 +12,14 @@ namespace Lab1
         private Form1 mainForm;
         private Panel canvas;
 
-        // Поля UI
         private Label lblBounds;
+        private TextBox txtFigureName;
         private TextBox txtCX, txtCY, txtRelX, txtRelY, txtScale, txtThick, txtSideRelX, txtSideRelY;
         private Panel pnlFillColor, pnlSideColor;
         private ComboBox cbSides;
+
+        // ИСПРАВЛЕНИЕ 3: Плоский список для хранения сторон даже из вложенных групп
+        private List<SideStyle> flatSides = new List<SideStyle>();
 
         public EditorForm(Figure figure, Form1 main, Panel canvasPanel)
         {
@@ -31,60 +34,52 @@ namespace Lab1
         private void InitializeUI()
         {
             this.Font = new Font("Segoe UI", 12F, FontStyle.Regular);
-            this.Text = "Editor";
-
-            // ИСПРАВЛЕНО: Увеличиваем размер окна, чтобы всё поместилось (400 в ширину, 920 в высоту)
-            this.Size = new Size(400, 1000);
+            this.Text = "Редактор параметров";
+            this.Size = new Size(400, 1100);
             this.FormBorderStyle = FormBorderStyle.FixedToolWindow;
             this.StartPosition = FormStartPosition.Manual;
             this.TopMost = true;
 
-            // ИСПРАВЛЕНО: Рассчитываем позицию окна - справа по центру экрана
-            System.Drawing.Rectangle screen = Screen.PrimaryScreen.WorkingArea;
-            int formX = screen.Right - this.Width - 10; // 10 пикселей отступа от правого края
-            int formY = screen.Top + (screen.Height - this.Height) / 2; // По центру вертикали
-            this.Location = new Point(formX, formY);
+            Rectangle screen = Screen.PrimaryScreen.WorkingArea;
+            this.Location = new Point(screen.Right - this.Width - 10, screen.Top + (screen.Height - this.Height) / 2);
 
             int y = 10;
-            int elementWidth = 360; // ИСПРАВЛЕНО: Универсальная ширина элементов для новой ширины формы
+            int elementWidth = 360;
 
-            // Границы
+            AddLabel("Имя фигуры:", ref y);
+            txtFigureName = AddTextBox(ref y, elementWidth);
+            txtFigureName.TextChanged += (s, e) => { targetFigure.Name = txtFigureName.Text; mainForm.UpdateListForm(); };
+
             lblBounds = new Label { Location = new Point(10, y), Size = new Size(elementWidth, 90), Text = "Границы: ..." };
-            this.Controls.Add(lblBounds); y += 95; // ИСПРАВЛЕНО: увеличен отступ
+            this.Controls.Add(lblBounds); y += 95;
 
-            // Координаты центра
             AddLabel("Координаты центра (X, Y):", ref y);
             txtCX = AddTextBox(ref y, elementWidth);
             txtCY = AddTextBox(ref y, elementWidth);
 
-            // Сдвиг центра
             AddLabel("Сдвиг центра отн. (RelX, RelY):", ref y);
             txtRelX = AddTextBox(ref y, elementWidth);
             txtRelY = AddTextBox(ref y, elementWidth);
 
-            // Масштаб
             AddLabel("Масштаб (1.0 = 100%):", ref y);
             txtScale = AddTextBox(ref y, elementWidth);
 
-            // Цвет заливки
             AddLabel("Цвет фигуры:", ref y);
-            pnlFillColor = new Panel { Location = new Point(10, y+5), Size = new Size(35, 30), BorderStyle = BorderStyle.FixedSingle };
+            pnlFillColor = new Panel { Location = new Point(10, y + 5), Size = new Size(35, 30), BorderStyle = BorderStyle.FixedSingle };
             Button btnFill = new Button { Text = "Выбрать цвет заливки", Location = new Point(55, y), Size = new Size(elementWidth - 45, 40) };
             btnFill.Click += (s, e) => PickColor(pnlFillColor);
-            this.Controls.Add(pnlFillColor); this.Controls.Add(btnFill); y += 45; // ИСПРАВЛЕНО: увеличен отступ
+            this.Controls.Add(pnlFillColor); this.Controls.Add(btnFill); y += 45;
 
-            // Выбор стороны
             AddLabel("Выбор стороны для редактирования:", ref y);
             cbSides = new ComboBox { Location = new Point(10, y), Size = new Size(elementWidth, 30), DropDownStyle = ComboBoxStyle.DropDownList };
             cbSides.SelectedIndexChanged += (s, e) => LoadSideData();
-            this.Controls.Add(cbSides); y += 45; // ИСПРАВЛЕНО: увеличен отступ
+            this.Controls.Add(cbSides); y += 45;
 
-            // Свойства стороны
             AddLabel("Цвет стороны:", ref y);
-            pnlSideColor = new Panel { Location = new Point(10, y+5), Size = new Size(35, 30), BorderStyle = BorderStyle.FixedSingle };
+            pnlSideColor = new Panel { Location = new Point(10, y + 5), Size = new Size(35, 30), BorderStyle = BorderStyle.FixedSingle };
             Button btnSide = new Button { Text = "Выбрать цвет линии", Location = new Point(55, y), Size = new Size(elementWidth - 45, 40) };
             btnSide.Click += (s, e) => PickColor(pnlSideColor);
-            this.Controls.Add(pnlSideColor); this.Controls.Add(btnSide); y += 45; // ИСПРАВЛЕНО: увеличен отступ
+            this.Controls.Add(pnlSideColor); this.Controls.Add(btnSide); y += 45;
 
             AddLabel("Толщина стороны:", ref y);
             txtThick = AddTextBox(ref y, elementWidth);
@@ -93,30 +88,28 @@ namespace Lab1
             txtSideRelX = AddTextBox(ref y, elementWidth);
             txtSideRelY = AddTextBox(ref y, elementWidth);
 
-            // Кнопки управления
             Button btnApply = new Button { Text = "Применить", Location = new Point(10, y), Size = new Size(elementWidth, 45), BackColor = Color.LightGreen };
             btnApply.Click += ApplyChanges;
-            this.Controls.Add(btnApply); y += 55; // ИСПРАВЛЕНО: увеличен отступ
+            this.Controls.Add(btnApply); y += 55;
 
             Button btnDel = new Button { Text = "Удалить фигуру", Location = new Point(10, y), Size = new Size(elementWidth, 45), BackColor = Color.MistyRose };
             btnDel.Click += (s, e) =>
             {
                 mainForm.figures.Remove(targetFigure);
-                mainForm.selectedFigure = null;
-                canvas.Invalidate();
+                mainForm.selectedFigures.Remove(targetFigure); // Исправлено: удаляем из списка выделенных
+                mainForm.RefreshCanvas();
+                mainForm.UpdateListForm();
                 this.Close();
             };
             this.Controls.Add(btnDel);
         }
 
-        // ИСПРАВЛЕНО: Шаг Y увеличен, чтобы текст не обрезался
         private void AddLabel(string text, ref int y)
         {
             this.Controls.Add(new Label { Text = text, Location = new Point(10, y), AutoSize = true });
             y += 30;
         }
 
-        // ИСПРАВЛЕНО: Добавлен параметр ширины и увеличен шаг по Y
         private TextBox AddTextBox(ref int y, int width)
         {
             TextBox tb = new TextBox { Location = new Point(10, y), Size = new Size(width, 30) };
@@ -134,8 +127,29 @@ namespace Lab1
             }
         }
 
+        // ИСПРАВЛЕНИЕ 3: Рекурсивный метод для сбора всех сторон
+        private void PopulateSides(Figure f, string prefixName)
+        {
+            if (f is CompositeFigure comp)
+            {
+                for (int i = 0; i < comp.Children.Count; i++)
+                {
+                    PopulateSides(comp.Children[i], prefixName + $"Фигура {i + 1} -> ");
+                }
+            }
+            else
+            {
+                for (int i = 0; i < f.Sides.Count; i++)
+                {
+                    cbSides.Items.Add(prefixName + $"Сторона {i}");
+                    flatSides.Add(f.Sides[i]);
+                }
+            }
+        }
+
         private void LoadData()
         {
+            txtFigureName.Text = targetFigure.Name;
             RectangleF b = targetFigure.GetBounds();
             lblBounds.Text = $"Границы:\nMinX: {b.Left:F0}  MinY: {b.Top:F0}\nMaxX: {b.Right:F0}  MaxY: {b.Bottom:F0}";
 
@@ -146,8 +160,11 @@ namespace Lab1
             txtScale.Text = (targetFigure.Size / 100f).ToString();
             pnlFillColor.BackColor = targetFigure.FillColor;
 
+            // ИСПРАВЛЕНИЕ 3: Заполняем список с помощью рекурсивного метода
             cbSides.Items.Clear();
-            for (int i = 0; i < targetFigure.Sides.Count; i++) cbSides.Items.Add($"Сторона {i}");
+            flatSides.Clear();
+            PopulateSides(targetFigure, "");
+
             if (cbSides.Items.Count > 0) cbSides.SelectedIndex = 0;
         }
 
@@ -162,7 +179,10 @@ namespace Lab1
 
         private void LoadSideData()
         {
-            var side = targetFigure.Sides[cbSides.SelectedIndex];
+            if (cbSides.SelectedIndex < 0) return;
+
+            // ИСПРАВЛЕНИЕ 3: Берем сторону из нашего плоского списка
+            var side = flatSides[cbSides.SelectedIndex];
             pnlSideColor.BackColor = side.Color;
             txtThick.Text = side.Thickness.ToString();
             txtSideRelX.Text = side.RelativeOffset.X.ToString();
@@ -180,28 +200,23 @@ namespace Lab1
 
                 targetFigure.RelativePivot = newRelativePivot;
 
-                if (isBaseLocationChangedManually)
-                {
-                    targetFigure.BaseLocation = newBaseLocation;
-                }
-                else
-                {
-                    targetFigure.Center = oldVisualCenter;
-                }
+                if (isBaseLocationChangedManually) targetFigure.BaseLocation = newBaseLocation;
+                else targetFigure.Center = oldVisualCenter;
 
                 targetFigure.Size = (int)(float.Parse(txtScale.Text) * 100);
                 targetFigure.FillColor = pnlFillColor.BackColor;
 
                 if (cbSides.SelectedIndex >= 0)
                 {
-                    var side = targetFigure.Sides[cbSides.SelectedIndex];
+                    // ИСПРАВЛЕНИЕ 3: Применяем изменения к правильной стороне из плоского списка
+                    var side = flatSides[cbSides.SelectedIndex];
                     side.Color = pnlSideColor.BackColor;
                     side.Thickness = float.Parse(txtThick.Text);
                     side.RelativeOffset = new PointF(float.Parse(txtSideRelX.Text), float.Parse(txtSideRelY.Text));
                 }
 
                 LoadData();
-                canvas.Invalidate();
+                mainForm.RefreshCanvas();
             }
             catch (Exception ex)
             {

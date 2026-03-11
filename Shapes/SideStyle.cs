@@ -15,5 +15,13 @@ namespace Lab1.Shapes
         {
             RelativeOffset = new PointF(x, y);
         }
+        public SideStyle Clone()
+        {
+            return new SideStyle(RelativeOffset.X, RelativeOffset.Y)
+            {
+                Color = this.Color,
+                Thickness = this.Thickness
+            };
+        }
     }
 }

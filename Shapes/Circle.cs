@@ -5,8 +5,9 @@ namespace Lab1.Shapes
 {
     public class Circle : Figure
     {
-        public Circle(Point center) : base(center)
+        public Circle(Point center, string name = "Круг") : base(center)
         {
+            Name = name;
             Sides.Add(new SideStyle(50, 0));
         }
 
@@ -25,7 +26,6 @@ namespace Lab1.Shapes
                 g.DrawEllipse(p, Center.X - r, Center.Y - r, r * 2, r * 2);
         }
 
-        // НОВОЕ: Границы круга
         public override RectangleF GetBounds()
         {
             float scale = Size / 100f;
@@ -39,6 +39,14 @@ namespace Lab1.Shapes
             float scale = Size / 100f;
             float r = Math.Abs(Sides[0].RelativeOffset.X) * scale;
             return (Math.Pow(p.X - Center.X, 2) + Math.Pow(p.Y - Center.Y, 2)) <= r * r;
+        }
+        public override Figure Clone()
+        {
+            Circle clone = new Circle(new Point(this.BaseLocation.X, this.BaseLocation.Y), this.Name);
+            // Так как конструктор Circle по умолчанию добавляет сторону, очищаем список перед копированием
+            clone.Sides.Clear();
+            this.CopyBaseProperties(clone);
+            return clone;
         }
     }
 }

@@ -15,6 +15,10 @@ namespace Lab1
         private Button btnClearAll;
         private Button btnFullScreen;
 
+        // НОВЫЕ КНОПКИ
+        private Button btnToggleDraw;
+        private Button btnOpenList;
+
         protected override void Dispose(bool disposing)
         {
             if (disposing && (components != null)) components.Dispose();
@@ -26,20 +30,17 @@ namespace Lab1
             this.Text = "Shape Vector Editor";
             this.Size = new Size(1200, 800);
             this.KeyPreview = true;
-
-            // ИЗМЕНЕНО: Основной шрифт увеличен до 12
             this.Font = new Font("Segoe UI", 12F, FontStyle.Regular);
 
             // --- ВЕРХНЯЯ ПАНЕЛЬ ---
             toolbar = new Panel
             {
                 Dock = DockStyle.Top,
-                Height = 70, // ИЗМЕНЕНО: Панель стала чуть выше
+                Height = 70,
                 BackColor = Color.FromArgb(45, 45, 48),
                 Padding = new Padding(10)
             };
 
-            // 1. Выбор типа фигуры (ИЗМЕНЕНО: адаптирован размер)
             cbShapeType = new ComboBox
             {
                 Location = new Point(15, 18),
@@ -50,7 +51,6 @@ namespace Lab1
             cbShapeType.Items.AddRange(new object[] { "Прямоугольник", "Треугольник", "Круг", "Трапеция", "Пятиугольник" });
             cbShapeType.SelectedIndex = 0;
 
-            // 2. Добавить фигуру (ИЗМЕНЕНО: адаптирован размер и позиция)
             btnAddShape = new Button
             {
                 Text = "Добавить фигуру",
@@ -62,7 +62,6 @@ namespace Lab1
             };
             btnAddShape.FlatAppearance.BorderSize = 0;
 
-            // 3. Удалить всё (ИЗМЕНЕНО: адаптирован размер и позиция)
             btnClearAll = new Button
             {
                 Text = "Удалить всё",
@@ -74,7 +73,30 @@ namespace Lab1
             };
             btnClearAll.FlatAppearance.BorderSize = 0;
 
-            // 4. Полный экран (F11) (ИЗМЕНЕНО: адаптирован размер и позиция)
+            // ИСПРАВЛЕНИЕ 1: Кнопка режима рисования теперь на панели
+            btnToggleDraw = new Button
+            {
+                Text = "Рисование (Выкл)",
+                Location = new Point(540, 16),
+                Size = new Size(180, 36),
+                BackColor = Color.FromArgb(63, 63, 70),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat
+            };
+            btnToggleDraw.FlatAppearance.BorderSize = 0;
+
+            // ИСПРАВЛЕНИЕ 1: Кнопка списка фигур теперь на панели
+            btnOpenList = new Button
+            {
+                Text = "Список фигур",
+                Location = new Point(735, 16),
+                Size = new Size(150, 36),
+                BackColor = Color.FromArgb(63, 63, 70),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat
+            };
+            btnOpenList.FlatAppearance.BorderSize = 0;
+
             btnFullScreen = new Button
             {
                 Text = "Полный экран (F11)",
@@ -86,10 +108,12 @@ namespace Lab1
             };
             btnFullScreen.FlatAppearance.BorderSize = 0;
 
-            // Добавляем элементы на панель
+            // Добавляем все элементы на панель
             toolbar.Controls.Add(cbShapeType);
             toolbar.Controls.Add(btnAddShape);
             toolbar.Controls.Add(btnClearAll);
+            toolbar.Controls.Add(btnToggleDraw);
+            toolbar.Controls.Add(btnOpenList);
             toolbar.Controls.Add(btnFullScreen);
 
             // --- ХОЛСТ ---
