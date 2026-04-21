@@ -13,7 +13,7 @@ namespace Lab1
         private Panel canvas;
 
         private Label lblBounds;
-        private TextBox txtFigureName;
+        private TextBox txtFigureName, txtId;
         private TextBox txtCX, txtCY, txtRelX, txtRelY, txtScale, txtThick, txtSideRelX, txtSideRelY;
         private TextBox txtSideLength;
         private Panel pnlFillColor, pnlSideColor;
@@ -30,7 +30,6 @@ namespace Lab1
             InitializeUI();
             LoadData();
 
-            // Сбрасываем выделение стороны при закрытии редактора
             this.FormClosed += (s, e) =>
             {
                 if (targetFigure != null) targetFigure.HighlightedSide = null;
@@ -42,7 +41,7 @@ namespace Lab1
         {
             this.Font = new Font("Segoe UI", 12F, FontStyle.Regular);
             this.Text = "Редактор параметров";
-            this.Size = new Size(400, 1100);
+            this.Size = new Size(400, 1150);
             this.FormBorderStyle = FormBorderStyle.FixedToolWindow;
             this.StartPosition = FormStartPosition.Manual;
             this.TopMost = true;
@@ -52,6 +51,42 @@ namespace Lab1
 
             int y = 10;
             int elementWidth = 360;
+
+            Label lblIdHeader = new Label
+            {
+                Text = "ID ОБЪЕКТА:",
+                Location = new Point(10, y),
+                Size = new Size(elementWidth, 15),
+                Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+                ForeColor = Color.Gray
+            };
+
+            this.Controls.Add(lblIdHeader);
+            y += 18;
+
+            txtId = new TextBox
+            {
+                Location = new Point(10, y),
+                Size = new Size(elementWidth, 25),
+                ReadOnly = true,
+                BorderStyle = BorderStyle.None,
+                BackColor = SystemColors.Control,
+                Font = new Font("Consolas", 10F, FontStyle.Regular),
+                ForeColor = Color.DarkBlue,
+                TabStop = false
+            };
+            this.Controls.Add(txtId);
+            y += 25;
+
+            Label line = new Label
+            {
+                BorderStyle = BorderStyle.Fixed3D,
+                Height = 2,
+                Width = elementWidth,
+                Location = new Point(10, y)
+            };
+            this.Controls.Add(line);
+            y += 15; 
 
             AddLabel("Имя фигуры:", ref y);
             txtFigureName = AddTextBox(ref y, elementWidth);
@@ -158,6 +193,8 @@ namespace Lab1
 
         private void LoadData()
         {
+            txtId.Text = targetFigure.Id.ToString().ToUpper();
+
             txtFigureName.Text = targetFigure.Name;
             RectangleF b = targetFigure.GetBounds();
             lblBounds.Text = $"Границы:\nMinX: {b.Left:F0}  MinY: {b.Top:F0}\nMaxX: {b.Right:F0}  MaxY: {b.Bottom:F0}";
@@ -226,7 +263,40 @@ namespace Lab1
             }
             return null;
         }
+        private void txtSideLength_TextChanged(object sender, EventArgs e)
+        {
+            try
+            {
+                if (cbSides.SelectedItem is SideStyle side)
+                {
+                    Figure parent = FindParentFigure(targetFigure, side);
+                    if (parent != null)
+                    {
+                        int idx = parent.Sides.IndexOf(side);
+                        // Находим следующую точку (с учетом замыкания: если последняя, то берем первую)
+                        int nextIdx = (idx + 1) % parent.Sides.Count;
+                        var nextSide = parent.Sides[nextIdx];
 
+                        float newLen = float.Parse(txtSideLength.Text);
+
+                        float dx = nextSide.RelativeOffset.X - side.RelativeOffset.X;
+                        float dy = nextSide.RelativeOffset.Y - side.RelativeOffset.Y;
+                        double oldLen = Math.Sqrt(dx * dx + dy * dy);
+
+                        if (oldLen > 0.1)
+                        {
+                            // Двигаем следующую точку, сохраняя направление, тем самым "стыкуя" стороны
+                            nextSide.RelativeOffset = new PointF(
+                                side.RelativeOffset.X + (float)(dx / oldLen * newLen),
+                                side.RelativeOffset.Y + (float)(dy / oldLen * newLen)
+                            );
+                        }
+                    }
+                }
+                mainForm.RefreshCanvas();
+            }
+            catch { /* Игнорируем ошибки парсинга при вводе */ }
+        }
         private void ApplyChanges(object sender, EventArgs e)
         {
             try

@@ -9,7 +9,8 @@ namespace Lab1
 {
     public partial class Form1 : Form
     {
-        public List<Figure> figures = new List<Figure>();
+        public FigureArray figures = new FigureArray(); 
+
         private bool isDragging = false;
         private Point lastMousePos;
         private bool isFullScreen = false;
@@ -31,11 +32,14 @@ namespace Lab1
         {
             InitializeComponent();
 
+            this.Load += Form1_Load;
+
             btnToggleDraw.Click += (s, e) => {
                 isDrawingMode = !isDrawingMode;
                 btnToggleDraw.Text = isDrawingMode ? "Рисование (Вкл)" : "Рисование (Выкл)";
                 btnToggleDraw.BackColor = isDrawingMode ? Color.MediumSeaGreen : Color.FromArgb(63, 63, 70);
                 tempPoints.Clear();
+                UpdateDrawingUI();   // <-- этот вызов должен быть
                 RefreshCanvas();
             };
 
@@ -57,20 +61,133 @@ namespace Lab1
                 if (e.Control && e.KeyCode == Keys.G) GroupAndSaveTemplate();
             };
 
+            btnSave.Click += (s, e) =>
+            {
+                using (SaveFileDialog sfd = new SaveFileDialog())
+                {
+                    sfd.Filter = "JSON файлы (*.json)|*.json|Текстовые файлы (*.txt)|*.txt";
+                    if (sfd.ShowDialog() == DialogResult.OK)
+                    {
+                        FileManager.SaveToFile(figures, sfd.FileName);
+                        MessageBox.Show("Фигуры успешно сохранены!", "Сохранение");
+                    }
+                }
+            };
+
+            btnLoad.Click += (s, e) =>
+            {
+                using (OpenFileDialog ofd = new OpenFileDialog())
+                {
+                    ofd.Filter = "JSON файлы (*.json)|*.json|Текстовые файлы (*.txt)|*.txt";
+                    if (ofd.ShowDialog() == DialogResult.OK)
+                    {
+                        figures = FileManager.LoadFromFile(ofd.FileName);
+                        selectedFigures.Clear();
+                        if (currentEditor != null && !currentEditor.IsDisposed) currentEditor.Close();
+                        if (listForm != null && !listForm.IsDisposed) listForm.RefreshList();
+                        RefreshCanvas();
+                        MessageBox.Show("Фигуры загружены на холст!", "Загрузка");
+                    }
+                }
+            };
+
+            btnAddPointByParams.Click += (s, e) => {
+                if (!isDrawingMode || tempPoints == null || tempPoints.Count == 0) return;
+                if (nudAngle == null || nudLength == null) return;
+
+                int inputAngle = (int)nudAngle.Value;
+                double length = (double)nudLength.Value;
+
+                double absoluteAngleDeg = inputAngle;
+
+                if (tempPoints.Count >= 2)
+                {
+                    Point last = tempPoints[tempPoints.Count - 1]; // Точка B
+                    Point prev = tempPoints[tempPoints.Count - 2]; // Точка A
+
+                    double angBA = Math.Atan2(prev.Y - last.Y, prev.X - last.X) * 180.0 / Math.PI;
+
+                    absoluteAngleDeg = angBA + inputAngle;
+                }
+
+                double angleRad = absoluteAngleDeg * Math.PI / 180.0;
+                Point currentLastPoint = tempPoints.Last();
+                int newX = currentLastPoint.X + (int)Math.Round(length * Math.Cos(angleRad));
+                int newY = currentLastPoint.Y + (int)Math.Round(length * Math.Sin(angleRad));
+
+                tempPoints.Add(new Point(newX, newY));
+                RefreshCanvas();
+            };
+
             canvasPanel.Paint += CanvasPanel_Paint;
             canvasPanel.MouseDown += CanvasPanel_MouseDown;
             canvasPanel.MouseMove += CanvasPanel_MouseMove;
 
-            // Сбрасываем флаг перетаскивания при отпускании любой кнопки мыши
             canvasPanel.MouseUp += (s, e) => {
                 isDragging = false;
                 RefreshCanvas();
+            };
+
+            this.KeyPreview = true; 
+            this.KeyDown += (s, e) => {
+                if (e.Control && e.KeyCode == Keys.S)
+                {
+                    
+                    using (SaveFileDialog sfd = new SaveFileDialog())
+                    {
+                        sfd.Filter = "Текстовые файлы (*.txt)|*.txt|JSON файлы (*.json)|*.json";
+                        if (sfd.ShowDialog() == DialogResult.OK)
+                        {
+                            FileManager.SaveToFile(figures, sfd.FileName);
+                            MessageBox.Show("Фигуры успешно сохранены!", "Сохранение");
+                        }
+                    }
+                }
+                if (e.Control && e.KeyCode == Keys.O)
+                {
+                    
+                    using (OpenFileDialog ofd = new OpenFileDialog())
+                    {
+                        ofd.Filter = "Текстовые файлы (*.txt)|*.txt|JSON файлы (*.json)|*.json";
+                        if (ofd.ShowDialog() == DialogResult.OK)
+                        {
+                            figures = FileManager.LoadFromFile(ofd.FileName);
+                            selectedFigures.Clear();
+                            UpdateListForm();
+                            RefreshCanvas();
+                            MessageBox.Show("Фигуры загружены на холст!", "Загрузка");
+                        }
+                    }
+                }
             };
         }
 
         public void UpdateListForm()
         {
             if (listForm != null && !listForm.IsDisposed) listForm.RefreshList();
+        }
+
+        private void UpdateDrawingUI()
+        {
+            if (nudAngle == null || nudLength == null || btnAddPointByParams == null)
+                return;
+
+            bool drawingActive = isDrawingMode;
+            nudAngle.Visible = drawingActive;
+            nudLength.Visible = drawingActive;
+            btnAddPointByParams.Visible = drawingActive;
+
+            btnAddPointByParams.Enabled = drawingActive && tempPoints != null && tempPoints.Count > 0;
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+
+            foreach (var fig in figures)
+            {
+                fig.Draw(e.Graphics);
+            }
         }
 
         public void RefreshCanvas()
@@ -164,20 +281,30 @@ namespace Lab1
                         Point p1 = tempPoints[i - 1];
                         Point p2 = tempPoints[i];
 
-                        // Расчет угла
-                        double angleDeg = Math.Atan2(p2.Y - p1.Y, p2.X - p1.X) * 180.0 / Math.PI;
-                        if (angleDeg < 0) angleDeg += 360;
+                        double absAngle = Math.Atan2(p2.Y - p1.Y, p2.X - p1.X) * 180.0 / Math.PI;
+                        double displayAngle = absAngle;
 
-                        // --- НОВОЕ: Расчет длины сегмента ---
-                        double length = Math.Sqrt(Math.Pow(p2.X - p1.X, 2) + Math.Pow(p2.Y - p1.Y, 2));
+                        // ИСПРАВЛЕНИЕ: Высчитываем относительный угол для подписей
+                        if (i >= 2)
+                        {
+                            Point p0 = tempPoints[i - 2];
+                            double prevAbsAngle = Math.Atan2(p1.Y - p0.Y, p1.X - p0.X) * 180.0 / Math.PI;
+                            displayAngle = absAngle - prevAbsAngle;
+                        }
 
-                        string text = $"{Math.Round(angleDeg)}° | L: {Math.Round(length)}px";
+                        // Нормализация до 0-359
+                        displayAngle = Math.Round(displayAngle);
+                        while (displayAngle < 0) displayAngle += 360;
+                        while (displayAngle >= 360) displayAngle -= 360;
+
+                        double length = Math.Round(Math.Sqrt(Math.Pow(p2.X - p1.X, 2) + Math.Pow(p2.Y - p1.Y, 2)));
+
+                        string text = $"{displayAngle}° | L: {length}px";
                         PointF mid = new PointF((p1.X + p2.X) / 2f + 5, (p1.Y + p2.Y) / 2f - 15);
                         e.Graphics.DrawString(text, new Font("Segoe UI", 9, FontStyle.Bold), Brushes.Blue, mid);
                     }
                 }
 
-                // Отрисовка "резиновой нити" от последней точки до курсора
                 if (tempPoints.Count > 0)
                 {
                     Point lastPoint = tempPoints[tempPoints.Count - 1];
@@ -189,12 +316,23 @@ namespace Lab1
                     double dx = currentMousePos.X - lastPoint.X;
                     double dy = currentMousePos.Y - lastPoint.Y;
 
-                    // --- НОВОЕ: Длина и угол для динамической линии ---
-                    double angle = Math.Atan2(dy, dx) * (180.0 / Math.PI);
-                    if (angle < 0) angle += 360;
-                    double dist = Math.Sqrt(dx * dx + dy * dy);
+                    double absAngle = Math.Atan2(dy, dx) * 180.0 / Math.PI;
+                    double displayAngle = absAngle;
 
-                    string infoText = $"{Math.Round(angle, 1)}°\nL: {Math.Round(dist)}px";
+                    if (tempPoints.Count >= 2)
+                    {
+                        Point prevPoint = tempPoints[tempPoints.Count - 2];
+                        double prevAbsAngle = Math.Atan2(lastPoint.Y - prevPoint.Y, lastPoint.X - prevPoint.X) * 180.0 / Math.PI;
+                        displayAngle = absAngle - prevAbsAngle;
+                    }
+
+                    displayAngle = Math.Round(displayAngle);
+                    while (displayAngle < 0) displayAngle += 360;
+                    while (displayAngle >= 360) displayAngle -= 360;
+
+                    double dist = Math.Round(Math.Sqrt(dx * dx + dy * dy));
+
+                    string infoText = $"{displayAngle}°\nL: {dist}px";
                     e.Graphics.DrawString(infoText, new Font("Segoe UI", 9, FontStyle.Bold), Brushes.DarkBlue,
                                          currentMousePos.X + 15, currentMousePos.Y + 15);
                 }
@@ -217,14 +355,19 @@ namespace Lab1
                 }
             }
         }
-
         private void CanvasPanel_MouseDown(object sender, MouseEventArgs e)
         {
+            foreach (var fig in figures)
+            {
+                fig.HighlightedSide = null;
+            }
+
             if (isDrawingMode)
             {
                 if (e.Button == MouseButtons.Left)
                 {
                     tempPoints.Add(e.Location);
+                    UpdateDrawingUI();   // Сразу активируем кнопку
                     RefreshCanvas();
                 }
                 else if (e.Button == MouseButtons.Right && tempPoints.Count > 2)
@@ -235,9 +378,10 @@ namespace Lab1
                     {
                         newPoly.Sides.Add(new SideStyle(p.X - center.X, p.Y - center.Y));
                     }
+                    newPoly.SortVerticesClockwise();   // упорядочивание вершин (см. пункт 3)
                     figures.Add(newPoly);
                     tempPoints.Clear();
-                    UpdateListForm();
+                    UpdateDrawingUI();   // скрыть элементы управления
                     RefreshCanvas();
                 }
                 return;
@@ -260,18 +404,14 @@ namespace Lab1
                     if (!selectedFigures.Contains(figures[i]))
                         selectedFigures.Add(figures[i]);
 
-                    // Перетаскиваем только если зажата левая кнопка мыши
                     if (e.Button == MouseButtons.Left)
                     {
                         isDragging = true;
                     }
 
-                    // Если кликнули ПКМ, открываем окно свойств
                     if (e.Button == MouseButtons.Right)
                     {
-                        // Если выделено несколько фигур, но мы кликнули ПКМ по одной из них,
-                        // логично открыть редактор именно для той, по которой кликнули.
-                        // Поэтому мы сбрасываем выделение и оставляем только её (если не зажат Ctrl).
+                      
                         if (!isMultiSelect)
                         {
                             selectedFigures.Clear();
@@ -286,7 +426,6 @@ namespace Lab1
                 }
             }
 
-            // Если кликнули в пустоту — просто сбрасываем выделение
             if (!hit && !isMultiSelect)
             {
                 selectedFigures.Clear();
@@ -297,6 +436,50 @@ namespace Lab1
 
         private void CanvasPanel_MouseMove(object sender, MouseEventArgs e)
         {
+            if (isDrawingMode && tempPoints != null && tempPoints.Count > 0)
+            {
+                Point last = tempPoints.Last();
+                double dx = currentMousePos.X - last.X;
+                double dy = currentMousePos.Y - last.Y;
+                double angBC = Math.Atan2(dy, dx) * 180.0 / Math.PI;
+                double displayAngle = angBC;
+
+                if (tempPoints.Count >= 2)
+                {
+                    Point prev = tempPoints[tempPoints.Count - 2];
+                    double angBA = Math.Atan2(prev.Y - last.Y, prev.X - last.X) * 180.0 / Math.PI;
+                    displayAngle = angBC - angBA;
+                }
+
+                int finalAngle = (int)Math.Round(displayAngle);
+                while (finalAngle < 0) finalAngle += 360;
+                while (finalAngle >= 360) finalAngle -= 360;
+
+                double length = Math.Round(Math.Sqrt(dx * dx + dy * dy));
+
+                if (nudAngle != null)
+                {
+                    decimal newAngle = finalAngle;
+                    if (newAngle < nudAngle.Minimum) newAngle = nudAngle.Minimum;
+                    if (newAngle > nudAngle.Maximum) newAngle = nudAngle.Maximum;
+                    nudAngle.Value = newAngle;
+                }
+                if (nudLength != null)
+                {
+                    decimal newLength = (decimal)length;
+                    if (newLength < nudLength.Minimum) newLength = nudLength.Minimum;
+                    if (newLength > nudLength.Maximum) newLength = nudLength.Maximum;
+                    nudLength.Value = newLength;
+                }
+
+                if (nudAngle != null && !nudAngle.Visible) UpdateDrawingUI();
+            }
+            else
+            {
+                if (nudAngle != null && nudAngle.Visible)
+                    UpdateDrawingUI();
+            }
+
             currentMousePos = e.Location;
 
             if (isDragging && e.Button == MouseButtons.Left)
@@ -311,6 +494,28 @@ namespace Lab1
             }
 
             RefreshCanvas();
+        }
+        private void btnToggleDraw_Click(object sender, EventArgs e)
+        {
+            isDrawingMode = !isDrawingMode;
+            btnToggleDraw.Text = isDrawingMode ? "Рисование (Вкл)" : "Рисование (Выкл)";
+            btnToggleDraw.BackColor = isDrawingMode ? Color.MediumSeaGreen : Color.FromArgb(63, 63, 70);
+            tempPoints.Clear();
+            UpdateDrawingUI();   // Показываем/скрываем элементы
+            RefreshCanvas();
+        }
+
+        private void Form1_Load(object sender, EventArgs e)
+        {
+            if (nudAngle != null && nudLength != null && btnAddPointByParams != null)
+            {
+                nudAngle.Location = new Point(700, 18);
+                nudLength.Location = new Point(770, 18);
+                btnAddPointByParams.Location = new Point(850, 16);
+
+                nudAngle.DecimalPlaces = 0;
+                nudAngle.Increment = 1;
+            }
         }
     }
 }

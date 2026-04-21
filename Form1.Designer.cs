@@ -9,15 +9,20 @@ namespace Lab1
         private Panel toolbar;
         private DoubleBufferedPanel canvasPanel;
 
-        // Элементы управления в верхней панели
         private ComboBox cbShapeType;
         private Button btnAddShape;
         private Button btnClearAll;
         private Button btnFullScreen;
 
-        // НОВЫЕ КНОПКИ
         private Button btnToggleDraw;
         private Button btnOpenList;
+
+        private Button btnSave;
+        private Button btnLoad;
+
+        private NumericUpDown nudAngle;
+        private NumericUpDown nudLength;
+        private Button btnAddPointByParams;
 
         protected override void Dispose(bool disposing)
         {
@@ -32,7 +37,6 @@ namespace Lab1
             this.KeyPreview = true;
             this.Font = new Font("Segoe UI", 12F, FontStyle.Regular);
 
-            // --- ВЕРХНЯЯ ПАНЕЛЬ ---
             toolbar = new Panel
             {
                 Dock = DockStyle.Top,
@@ -40,6 +44,41 @@ namespace Lab1
                 BackColor = Color.FromArgb(45, 45, 48),
                 Padding = new Padding(10)
             };
+
+            nudAngle = new NumericUpDown
+            {
+                Location = new Point(980, 18),
+                Size = new Size(60, 30),
+                Minimum = 0,
+                Maximum = 360,
+                DecimalPlaces = 1,
+                Increment = 1,
+                Visible = false
+            };
+            nudLength = new NumericUpDown
+            {
+                Location = new Point(1050, 18),
+                Size = new Size(70, 30),
+                Minimum = 1,
+                Maximum = 2000,
+                DecimalPlaces = 0,
+                Increment = 10,
+                Visible = false
+            };
+            btnAddPointByParams = new Button
+            {
+                Text = "Добавить точку",
+                Location = new Point(1130, 16),
+                Size = new Size(120, 36),
+                BackColor = Color.LightBlue,
+                FlatStyle = FlatStyle.Flat,
+                Visible = false
+            };
+            toolbar.Controls.AddRange(new Control[] { nudAngle, nudLength, btnAddPointByParams });
+
+            nudAngle.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            nudLength.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnAddPointByParams.Anchor = AnchorStyles.Top | AnchorStyles.Right;
 
             cbShapeType = new ComboBox
             {
@@ -73,7 +112,6 @@ namespace Lab1
             };
             btnClearAll.FlatAppearance.BorderSize = 0;
 
-            // ИСПРАВЛЕНИЕ 1: Кнопка режима рисования теперь на панели
             btnToggleDraw = new Button
             {
                 Text = "Рисование (Выкл)",
@@ -85,7 +123,6 @@ namespace Lab1
             };
             btnToggleDraw.FlatAppearance.BorderSize = 0;
 
-            // ИСПРАВЛЕНИЕ 1: Кнопка списка фигур теперь на панели
             btnOpenList = new Button
             {
                 Text = "Список фигур",
@@ -108,15 +145,33 @@ namespace Lab1
             };
             btnFullScreen.FlatAppearance.BorderSize = 0;
 
-            // Добавляем все элементы на панель
+            btnSave = new Button();
+            btnSave.Text = "Сохранить";
+            btnSave.Size = new Size(190, 36);
+            btnSave.Location = new Point(930, 16);
+            btnSave.BackColor = Color.FromArgb(0, 122, 204);
+            btnSave.FlatStyle = FlatStyle.Flat;
+            btnSave.ForeColor = Color.White;
+            btnSave.FlatAppearance.BorderSize = 0;
+
+            btnLoad = new Button();
+            btnLoad.Text = "Загрузить";
+            btnLoad.Size = new Size(190, 36);
+            btnLoad.Location = new Point(1125, 16); 
+            btnLoad.BackColor = Color.FromArgb(0, 122, 204);
+            btnLoad.FlatStyle = FlatStyle.Flat;
+            btnLoad.ForeColor = Color.White;
+            btnLoad.FlatAppearance.BorderSize = 0;
+
             toolbar.Controls.Add(cbShapeType);
             toolbar.Controls.Add(btnAddShape);
             toolbar.Controls.Add(btnClearAll);
             toolbar.Controls.Add(btnToggleDraw);
             toolbar.Controls.Add(btnOpenList);
             toolbar.Controls.Add(btnFullScreen);
+            toolbar.Controls.Add(btnSave);
+            toolbar.Controls.Add(btnLoad);
 
-            // --- ХОЛСТ ---
             canvasPanel = new DoubleBufferedPanel
             {
                 Dock = DockStyle.Fill,

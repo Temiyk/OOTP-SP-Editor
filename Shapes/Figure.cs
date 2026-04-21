@@ -1,11 +1,16 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 
 namespace Lab1.Shapes
 {
+    [Serializable]
     public abstract class Figure
     {
+        private static int _nextId = 1; // Счетчик для новых фигур
+        public int Id { get; set; }
+
         public string Name { get; set; } = "Новая фигура";
 
         public int Size { get; set; } = 100;
@@ -34,12 +39,15 @@ namespace Lab1.Shapes
         public Figure(Point center)
         {
             BaseLocation = center;
+            Id = _nextId++;
         }
 
         public abstract void Draw(Graphics g);
         public abstract bool Contains(Point p);
         public abstract RectangleF GetBounds();
         public abstract Figure Clone();
+        public static void SetNextId(int value) => _nextId = value;
+        public static int GetCurrentMaxId() => _nextId;
         public virtual void Move(int dx, int dy)
         {
             BaseLocation = new Point(BaseLocation.X + dx, BaseLocation.Y + dy);
@@ -52,7 +60,6 @@ namespace Lab1.Shapes
             clone.RelativePivot = new PointF(this.RelativePivot.X, this.RelativePivot.Y);
             clone.FillColor = this.FillColor;
 
-            // Глубокое копирование списка сторон
             clone.Sides = new List<SideStyle>();
             foreach (var side in this.Sides)
             {

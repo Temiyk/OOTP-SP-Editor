@@ -180,5 +180,15 @@ namespace Lab1.Shapes
             this.CopyBaseProperties(clone);
             return clone;
         }
+
+        public void SortVerticesClockwise()
+        {
+            if (Sides.Count < 3) return;
+            // Вычисляем центроид (среднюю точку)
+            float cx = Sides.Average(s => s.RelativeOffset.X);
+            float cy = Sides.Average(s => s.RelativeOffset.Y);
+            // Сортируем по углу относительно центроида
+            Sides = Sides.OrderBy(s => Math.Atan2(s.RelativeOffset.Y - cy, s.RelativeOffset.X - cx)).ToList();
+        }
     }
 }
