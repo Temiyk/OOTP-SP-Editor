@@ -128,6 +128,91 @@ namespace Lab1
                 RefreshCanvas();
             };
 
+            btnSaveSelected.Click += (s, e) =>
+            {
+                // 1. Проверяем, есть ли вообще выделенные фигуры
+                if (selectedFigures.Count == 0)
+                {
+                    MessageBox.Show("Нет выделенных фигур для сохранения.");
+                    return;
+                }
+
+                // 2. Открываем диалоговое окно для выбора места сохранения
+                using (SaveFileDialog sfd = new SaveFileDialog())
+                {
+                    sfd.Filter = "JSON файлы (*.json)|*.json|Текстовые файлы (*.txt)|*.txt";
+                    sfd.Title = "Сохранить выделенные фигуры как...";
+
+                    if (sfd.ShowDialog() == DialogResult.OK)
+                    {
+                        // 3. Создаем временный объект FigureArray, так как FileManager работает с ним
+                        FigureArray tempArray = new FigureArray();
+
+                        // 4. Копируем все выделенные фигуры во временный массив
+                        foreach (var fig in selectedFigures)
+                        {
+                            tempArray.Add(fig);
+                        }
+                        // 5. Вызываем сохранение целого массива фигур
+                        FileManager.SaveToFile(tempArray, sfd.FileName);
+
+                        // 6. Сообщаем пользователю об успехе
+                        MessageBox.Show($"Успешно сохранено фигур: {selectedFigures.Count}", "Сохранение");
+                    }
+                }
+            };
+
+            btnLoadAdd.Click += (s, e) =>
+            {
+                using (OpenFileDialog ofd = new OpenFileDialog())
+                {
+                    ofd.Filter = "Файл фигуры (*.json)|*.json|Текстовый файл (*.txt)|*.txt";
+                    ofd.Title = "Выберите файл с фигурой(ами)";
+                    ofd.Multiselect = false;
+                    if (ofd.ShowDialog() == DialogResult.OK)
+                    {
+                        try
+                        {
+                            List<Figure> loadedFigures = FileManager.LoadFiguresFromFile(ofd.FileName);
+                            if (loadedFigures.Count == 0)
+                            {
+                                MessageBox.Show("Файл не содержит фигур.");
+                                return;
+                            }
+
+                            // Рекурсивный помощник для переназначения ID, чтобы не забыть вложенные группы
+                            Action<Figure> assignNewId = null;
+                            assignNewId = (f) => {
+                                f.Id = Figure.GetCurrentMaxId();
+                                Figure.SetNextId(f.Id + 1);
+                                if (f is CompositeFigure comp)
+                                {
+                                    foreach (var c in comp.Children) assignNewId(c);
+                                }
+                            };
+
+                            // Добавляем все загруженные фигуры на холст с НОВЫМИ ID
+                            foreach (var fig in loadedFigures)
+                            {
+                                assignNewId(fig);
+                                figures.Add(fig);
+                            }
+
+                            // Обновляем интерфейс
+                            selectedFigures.Clear();
+                            UpdateListForm();
+                            RefreshCanvas();
+                            MessageBox.Show($"Загружено фигур: {loadedFigures.Count}.", "Добавление");
+                        }
+                        catch (Exception ex)
+                        {
+                            MessageBox.Show("Ошибка при загрузке: " + ex.Message);
+                        }
+                    }
+                }
+            };
+
+
             this.KeyPreview = true; 
             this.KeyDown += (s, e) => {
                 if (e.Control && e.KeyCode == Keys.S)
@@ -178,6 +263,17 @@ namespace Lab1
             btnAddPointByParams.Visible = drawingActive;
 
             btnAddPointByParams.Enabled = drawingActive && tempPoints != null && tempPoints.Count > 0;
+
+            if (btnSaveSelected != null)
+            {
+                btnSaveSelected.Visible = !drawingActive;
+                btnSaveSelected.Enabled = !drawingActive;
+            }
+            if (btnLoadAdd != null)
+            {
+                btnLoadAdd.Visible = !drawingActive;
+                btnLoadAdd.Enabled = !drawingActive;
+            }
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -240,11 +336,12 @@ namespace Lab1
 
             switch (selectedType)
             {
-                case "Прямоугольник": f = CustomPolygon.CreateRectangle(center); break;
-                case "Треугольник": f = CustomPolygon.CreateTriangle(center); break;
-                case "Круг": f = new Circle(center); break;
-                case "Трапеция": f = CustomPolygon.CreateTrapezium(center); break;
-                case "Пятиугольник": f = CustomPolygon.CreatePentagon(center); break;
+                case "Прямоугольник": f = Polygon.CreateRectangle(center); break;
+                case "Треугольник": f = Polygon.CreateTriangle(center); break;
+                case "Круг": f = Ellipse.CreateCircle(center); break;
+                case "Эллипс": f = new Ellipse(center, 60, 30, "Эллипс"); break;
+                case "Трапеция": f = Polygon.CreateTrapezium(center); break;
+                case "Пятиугольник": f = Polygon.CreatePentagon(center); break;
                 default:
                     if (selectedType != null && customTemplates.ContainsKey(selectedType))
                     {
@@ -373,7 +470,7 @@ namespace Lab1
                 else if (e.Button == MouseButtons.Right && tempPoints.Count > 2)
                 {
                     Point center = tempPoints[0];
-                    var newPoly = new CustomPolygon(center, "Нарисованная фигура");
+                    var newPoly = new Polygon(center, "Нарисованная фигура");
                     foreach (var p in tempPoints)
                     {
                         newPoly.Sides.Add(new SideStyle(p.X - center.X, p.Y - center.Y));

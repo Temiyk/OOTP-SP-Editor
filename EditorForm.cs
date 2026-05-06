@@ -1,4 +1,5 @@
-﻿using Lab1.Shapes;
+﻿// EditorForm.cs
+using Lab1.Shapes;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -12,12 +13,20 @@ namespace Lab1
         private Form1 mainForm;
         private Panel canvas;
 
+        private bool isUpdatingUI = false;
+
         private Label lblBounds;
         private TextBox txtFigureName, txtId;
         private TextBox txtCX, txtCY, txtRelX, txtRelY, txtScale, txtThick, txtSideRelX, txtSideRelY;
         private TextBox txtSideLength;
         private Panel pnlFillColor, pnlSideColor;
         private ComboBox cbSides;
+
+        private TextBox txtRadiusX, txtRadiusY, txtAngle;
+
+        private Label lblRadiusX, lblRadiusY, lblAngle;
+        private Label lblSides, lblSideColor, lblThick, lblSideRel, lblSideLength;
+        private Button btnSideColor;
 
         private List<SideStyle> flatSides = new List<SideStyle>();
 
@@ -41,7 +50,7 @@ namespace Lab1
         {
             this.Font = new Font("Segoe UI", 12F, FontStyle.Regular);
             this.Text = "Редактор параметров";
-            this.Size = new Size(400, 1150);
+            this.Size = new Size(400, 1100);
             this.FormBorderStyle = FormBorderStyle.FixedToolWindow;
             this.StartPosition = FormStartPosition.Manual;
             this.TopMost = true;
@@ -60,7 +69,6 @@ namespace Lab1
                 Font = new Font("Segoe UI", 8F, FontStyle.Bold),
                 ForeColor = Color.Gray
             };
-
             this.Controls.Add(lblIdHeader);
             y += 18;
 
@@ -86,7 +94,7 @@ namespace Lab1
                 Location = new Point(10, y)
             };
             this.Controls.Add(line);
-            y += 15; 
+            y += 15;
 
             AddLabel("Имя фигуры:", ref y);
             txtFigureName = AddTextBox(ref y, elementWidth);
@@ -109,35 +117,50 @@ namespace Lab1
             AddLabel("Цвет фигуры:", ref y);
             pnlFillColor = new Panel { Location = new Point(10, y + 5), Size = new Size(35, 30), BorderStyle = BorderStyle.FixedSingle };
             Button btnFill = new Button { Text = "Выбрать цвет заливки", Location = new Point(55, y), Size = new Size(elementWidth - 45, 40) };
-            btnFill.Click += (s, e) => PickColor(pnlFillColor);
+            btnFill.Click += (s, e) => { PickColor(pnlFillColor); AutoApply(null, null); };
             this.Controls.Add(pnlFillColor); this.Controls.Add(btnFill); y += 45;
 
-            AddLabel("Выбор стороны для редактирования:", ref y);
+            // Общие элементы: цвет и толщина контура
+            lblSideColor = AddLabel("Цвет контура/стороны:", ref y);
+            pnlSideColor = new Panel { Location = new Point(10, y + 5), Size = new Size(35, 30), BorderStyle = BorderStyle.FixedSingle };
+            btnSideColor = new Button { Text = "Выбрать цвет линии", Location = new Point(55, y), Size = new Size(elementWidth - 45, 40) };
+            btnSideColor.Click += (s, e) => { PickColor(pnlSideColor); AutoApply(null, null); };
+            this.Controls.Add(pnlSideColor); this.Controls.Add(btnSideColor); y += 45;
+
+            lblThick = AddLabel("Толщина контура/стороны:", ref y);
+            txtThick = AddTextBox(ref y, elementWidth);
+
+            int ySpecificStart = y;
+
+            // --- Специфические элементы для многоугольника ---
+            lblSides = AddLabel("Выбор стороны для редактирования:", ref y);
             cbSides = new ComboBox { Location = new Point(10, y), Size = new Size(elementWidth, 30), DropDownStyle = ComboBoxStyle.DropDownList };
             cbSides.SelectedIndexChanged += (s, e) => LoadSideData();
             this.Controls.Add(cbSides); y += 45;
 
-            AddLabel("Цвет стороны:", ref y);
-            pnlSideColor = new Panel { Location = new Point(10, y + 5), Size = new Size(35, 30), BorderStyle = BorderStyle.FixedSingle };
-            Button btnSide = new Button { Text = "Выбрать цвет линии", Location = new Point(55, y), Size = new Size(elementWidth - 45, 40) };
-            btnSide.Click += (s, e) => PickColor(pnlSideColor);
-            this.Controls.Add(pnlSideColor); this.Controls.Add(btnSide); y += 45;
-
-            AddLabel("Толщина стороны:", ref y);
-            txtThick = AddTextBox(ref y, elementWidth);
-
-            AddLabel("Смещение стороны (RelX, RelY):", ref y);
+            lblSideRel = AddLabel("Смещение стороны (RelX, RelY):", ref y);
             txtSideRelX = AddTextBox(ref y, elementWidth);
             txtSideRelY = AddTextBox(ref y, elementWidth);
 
-            AddLabel("Длина стороны (px):", ref y);
+            lblSideLength = AddLabel("Длина стороны (px):", ref y);
             txtSideLength = AddTextBox(ref y, elementWidth);
 
-            Button btnApply = new Button { Text = "Применить", Location = new Point(10, y), Size = new Size(elementWidth, 45), BackColor = Color.LightGreen };
-            btnApply.Click += ApplyChanges;
-            this.Controls.Add(btnApply); y += 55;
+            int yAfterPoly = y;
 
-            Button btnDel = new Button { Text = "Удалить фигуру", Location = new Point(10, y), Size = new Size(elementWidth, 45), BackColor = Color.MistyRose };
+            // --- Специфические элементы для эллипса ---
+            y = ySpecificStart;
+            lblRadiusX = AddLabel("Радиус X:", ref y);
+            txtRadiusX = AddTextBox(ref y, elementWidth);
+            lblRadiusY = AddLabel("Радиус Y:", ref y);
+            txtRadiusY = AddTextBox(ref y, elementWidth);
+            lblAngle = AddLabel("Угол поворота (градусы):", ref y);
+            txtAngle = AddTextBox(ref y, elementWidth);
+
+            int yAfterEllipse = y;
+            y = Math.Max(yAfterPoly, yAfterEllipse);
+
+            // Кнопка удаления
+            Button btnDel = new Button { Text = "Удалить фигуру", Location = new Point(10, y + 10), Size = new Size(elementWidth, 45), BackColor = Color.MistyRose };
             btnDel.Click += (s, e) =>
             {
                 mainForm.figures.Remove(targetFigure);
@@ -147,12 +170,28 @@ namespace Lab1
                 this.Close();
             };
             this.Controls.Add(btnDel);
+
+            // Подписки на авто‑применение
+            txtCX.TextChanged += AutoApply;
+            txtCY.TextChanged += AutoApply;
+            txtRelX.TextChanged += AutoApply;
+            txtRelY.TextChanged += AutoApply;
+            txtScale.TextChanged += AutoApply;
+            txtRadiusX.TextChanged += AutoApply;
+            txtRadiusY.TextChanged += AutoApply;
+            txtAngle.TextChanged += AutoApply;
+            txtThick.TextChanged += AutoApply;
+            txtSideRelX.TextChanged += AutoApply;
+            txtSideRelY.TextChanged += AutoApply;
+            txtSideLength.TextChanged += AutoApply;
         }
 
-        private void AddLabel(string text, ref int y)
+        private Label AddLabel(string text, ref int y)
         {
-            this.Controls.Add(new Label { Text = text, Location = new Point(10, y), AutoSize = true });
+            Label lbl = new Label { Text = text, Location = new Point(10, y), AutoSize = true };
+            this.Controls.Add(lbl);
             y += 30;
+            return lbl;
         }
 
         private TextBox AddTextBox(ref int y, int width)
@@ -193,11 +232,12 @@ namespace Lab1
 
         private void LoadData()
         {
-            txtId.Text = targetFigure.Id.ToString().ToUpper();
+            isUpdatingUI = true;
 
+            txtId.Text = targetFigure.Id.ToString().ToUpper();
             txtFigureName.Text = targetFigure.Name;
-            RectangleF b = targetFigure.GetBounds();
-            lblBounds.Text = $"Границы:\nMinX: {b.Left:F0}  MinY: {b.Top:F0}\nMaxX: {b.Right:F0}  MaxY: {b.Bottom:F0}";
+
+            UpdateBoundsLabel();
 
             txtCX.Text = targetFigure.BaseLocation.X.ToString();
             txtCY.Text = targetFigure.BaseLocation.Y.ToString();
@@ -208,27 +248,66 @@ namespace Lab1
 
             cbSides.Items.Clear();
             flatSides.Clear();
-            PopulateSides(targetFigure, "");
 
-            if (cbSides.Items.Count > 0) cbSides.SelectedIndex = 0;
+            bool isEllipse = targetFigure is Ellipse;
+
+            lblRadiusX.Visible = txtRadiusX.Visible = isEllipse;
+            lblRadiusY.Visible = txtRadiusY.Visible = isEllipse;
+            lblAngle.Visible = txtAngle.Visible = isEllipse;
+
+            lblSides.Visible = cbSides.Visible = !isEllipse;
+            lblSideRel.Visible = txtSideRelX.Visible = txtSideRelY.Visible = !isEllipse;
+            lblSideLength.Visible = txtSideLength.Visible = !isEllipse;
+
+            lblSideColor.Visible = pnlSideColor.Visible = btnSideColor.Visible = true;
+            lblThick.Visible = txtThick.Visible = true;
+
+            if (isEllipse)
+            {
+                Ellipse ellipse = (Ellipse)targetFigure;
+                txtRadiusX.Text = ellipse.RadiusX.ToString();
+                txtRadiusY.Text = ellipse.RadiusY.ToString();
+                txtAngle.Text = Math.Round(ellipse.Angle, 1).ToString();
+
+                if (ellipse.Sides.Count > 0)
+                {
+                    pnlSideColor.BackColor = ellipse.Sides[0].Color;
+                    txtThick.Text = ellipse.Sides[0].Thickness.ToString();
+                }
+            }
+            else
+            {
+                PopulateSides(targetFigure, "");
+            }
+
+            isUpdatingUI = false;
+
+            if (cbSides.Items.Count > 0 && !isEllipse) cbSides.SelectedIndex = 0;
+        }
+
+        private void UpdateBoundsLabel()
+        {
+            RectangleF b = targetFigure.GetBounds();
+            lblBounds.Text = $"Границы:\nMinX: {b.Left:F0}  MinY: {b.Top:F0}\nMaxX: {b.Right:F0}  MaxY: {b.Bottom:F0}";
         }
 
         public void UpdateCoordinates()
         {
-            RectangleF b = targetFigure.GetBounds();
-            lblBounds.Text = $"Границы:\nMinX: {b.Left:F0}  MinY: {b.Top:F0}\nMaxX: {b.Right:F0}  MaxY: {b.Bottom:F0}";
+            UpdateBoundsLabel();
 
+            isUpdatingUI = true;
             if (!txtCX.Focused) txtCX.Text = targetFigure.BaseLocation.X.ToString();
             if (!txtCY.Focused) txtCY.Text = targetFigure.BaseLocation.Y.ToString();
+            isUpdatingUI = false;
         }
 
         private void LoadSideData()
         {
-            if (cbSides.SelectedIndex < 0) return;
+            if (cbSides.SelectedIndex < 0 || targetFigure is Ellipse) return;
+
+            isUpdatingUI = true;
 
             var side = flatSides[cbSides.SelectedIndex];
-
-            // Устанавливаем сторону для мерцания/выделения и перерисовываем холст
             targetFigure.HighlightedSide = side;
             mainForm.RefreshCanvas();
 
@@ -236,18 +315,20 @@ namespace Lab1
             txtThick.Text = side.Thickness.ToString();
             txtSideRelX.Text = side.RelativeOffset.X.ToString();
             txtSideRelY.Text = side.RelativeOffset.Y.ToString();
+
             Figure parent = FindParentFigure(targetFigure, side);
             if (parent != null)
             {
                 int idx = parent.Sides.IndexOf(side);
                 int nextIdx = (idx + 1) % parent.Sides.Count;
                 var nextSide = parent.Sides[nextIdx];
-
                 double dx = nextSide.RelativeOffset.X - side.RelativeOffset.X;
                 double dy = nextSide.RelativeOffset.Y - side.RelativeOffset.Y;
                 double length = Math.Sqrt(dx * dx + dy * dy);
                 txtSideLength.Text = Math.Round(length).ToString();
             }
+
+            isUpdatingUI = false;
         }
 
         private Figure FindParentFigure(Figure root, SideStyle side)
@@ -263,41 +344,15 @@ namespace Lab1
             }
             return null;
         }
-        private void txtSideLength_TextChanged(object sender, EventArgs e)
+
+        private void AutoApply(object sender, EventArgs e)
         {
-            try
-            {
-                if (cbSides.SelectedItem is SideStyle side)
-                {
-                    Figure parent = FindParentFigure(targetFigure, side);
-                    if (parent != null)
-                    {
-                        int idx = parent.Sides.IndexOf(side);
-                        // Находим следующую точку (с учетом замыкания: если последняя, то берем первую)
-                        int nextIdx = (idx + 1) % parent.Sides.Count;
-                        var nextSide = parent.Sides[nextIdx];
+            if (isUpdatingUI) return;
 
-                        float newLen = float.Parse(txtSideLength.Text);
-
-                        float dx = nextSide.RelativeOffset.X - side.RelativeOffset.X;
-                        float dy = nextSide.RelativeOffset.Y - side.RelativeOffset.Y;
-                        double oldLen = Math.Sqrt(dx * dx + dy * dy);
-
-                        if (oldLen > 0.1)
-                        {
-                            // Двигаем следующую точку, сохраняя направление, тем самым "стыкуя" стороны
-                            nextSide.RelativeOffset = new PointF(
-                                side.RelativeOffset.X + (float)(dx / oldLen * newLen),
-                                side.RelativeOffset.Y + (float)(dy / oldLen * newLen)
-                            );
-                        }
-                    }
-                }
-                mainForm.RefreshCanvas();
-            }
-            catch { /* Игнорируем ошибки парсинга при вводе */ }
+            ApplyChangesSafe();
         }
-        private void ApplyChanges(object sender, EventArgs e)
+
+        private void ApplyChangesSafe()
         {
             try
             {
@@ -307,60 +362,79 @@ namespace Lab1
                 bool isBaseLocationChangedManually = (newBaseLocation != targetFigure.BaseLocation);
 
                 targetFigure.RelativePivot = newRelativePivot;
-
                 if (isBaseLocationChangedManually) targetFigure.BaseLocation = newBaseLocation;
                 else targetFigure.Center = oldVisualCenter;
 
                 targetFigure.Size = (int)(float.Parse(txtScale.Text) * 100);
                 targetFigure.FillColor = pnlFillColor.BackColor;
 
-                if (cbSides.SelectedIndex >= 0)
+                if (targetFigure is Ellipse el)
                 {
-                    var side = flatSides[cbSides.SelectedIndex];
-                    side.Color = pnlSideColor.BackColor;
-                    side.Thickness = float.Parse(txtThick.Text);
-                    side.RelativeOffset = new PointF(float.Parse(txtSideRelX.Text), float.Parse(txtSideRelY.Text));
+                    float a = float.Parse(txtRadiusX.Text);
+                    float b = float.Parse(txtRadiusY.Text);
+                    float angle = float.Parse(txtAngle.Text);
+
+                    float maxR = Math.Max(a, b);
+                    float minR = Math.Min(a, b);
+
+                    if (b > a) angle += 90;
+
+                    float c = (float)Math.Sqrt(Math.Max(0, maxR * maxR - minR * minR));
+                    double rad = angle * Math.PI / 180.0;
+
+                    el.Focus1 = new PointF((float)(-c * Math.Cos(rad)), (float)(-c * Math.Sin(rad)));
+                    el.Focus2 = new PointF((float)(c * Math.Cos(rad)), (float)(c * Math.Sin(rad)));
+                    el.DistanceSum = maxR * 2;
+
+                    if (el.Sides.Count > 0)
+                    {
+                        el.Sides[0].Color = pnlSideColor.BackColor;
+                        el.Sides[0].Thickness = float.Parse(txtThick.Text);
+                    }
                 }
-
-                if (cbSides.SelectedIndex >= 0)
+                else if (cbSides.SelectedIndex >= 0)
                 {
                     var side = flatSides[cbSides.SelectedIndex];
                     side.Color = pnlSideColor.BackColor;
                     side.Thickness = float.Parse(txtThick.Text);
+
                     side.RelativeOffset = new PointF(float.Parse(txtSideRelX.Text), float.Parse(txtSideRelY.Text));
 
-                    // --- НОВОЕ: Изменение длины ---
+                    if (targetFigure is Polygon poly)
+                    {
+                        poly.Vertices[cbSides.SelectedIndex] = side.RelativeOffset;
+                    }
+
                     Figure parent = FindParentFigure(targetFigure, side);
                     if (parent != null)
                     {
                         int idx = parent.Sides.IndexOf(side);
                         int nextIdx = (idx + 1) % parent.Sides.Count;
                         var nextSide = parent.Sides[nextIdx];
-
                         float newLen = float.Parse(txtSideLength.Text);
-
-                        // Вектор текущего направления
                         float dx = nextSide.RelativeOffset.X - side.RelativeOffset.X;
                         float dy = nextSide.RelativeOffset.Y - side.RelativeOffset.Y;
                         double oldLen = Math.Sqrt(dx * dx + dy * dy);
 
-                        if (oldLen > 0.1) // Чтобы не делить на ноль
+                        if (oldLen > 0.1)
                         {
-                            // Новые координаты следующей точки = старт + (направление * новая_длина)
                             nextSide.RelativeOffset = new PointF(
                                 side.RelativeOffset.X + (float)(dx / oldLen * newLen),
                                 side.RelativeOffset.Y + (float)(dy / oldLen * newLen)
                             );
+                            if (parent is Polygon parentPoly)
+                            {
+                                parentPoly.Vertices[nextIdx] = nextSide.RelativeOffset;
+                            }
                         }
                     }
                 }
 
-                LoadData();
+                UpdateBoundsLabel();
                 mainForm.RefreshCanvas();
             }
-            catch (Exception ex)
+            catch
             {
-                MessageBox.Show("Ошибка ввода данных: " + ex.Message);
             }
         }
     }

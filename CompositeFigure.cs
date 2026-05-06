@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using Newtonsoft.Json;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 
@@ -6,7 +7,12 @@ namespace Lab1.Shapes
 {
     public class CompositeFigure : Figure
     {
-        public List<Figure> Children { get; private set; } = new List<Figure>();
+        [JsonProperty]
+        public List<Figure> Children { get; set; } = new List<Figure>();
+
+        // --- ДОБАВЛЕНО: Конструктор для JSON ---
+        [JsonConstructor]
+        protected CompositeFigure() { }
 
         public CompositeFigure(List<Figure> children, string name = "Группа фигур")
             : base(children.Count > 0 ? children[0].BaseLocation : new Point(0, 0))

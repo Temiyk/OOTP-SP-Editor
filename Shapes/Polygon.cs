@@ -1,64 +1,113 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Numerics;
+using Newtonsoft.Json;
 
 namespace Lab1.Shapes
 {
-    public class CustomPolygon : Figure
+    public class Polygon : Figure
     {
-        public CustomPolygon(Point center, string name = "Произвольная фигура") : base(center)
+        [JsonProperty]
+        public List<PointF> Vertices { get; set; } = new List<PointF>();
+        
+        [JsonConstructor]
+        protected Polygon() { }
+        public Polygon(Point center, string name = "Многоугольник") : base(center)
         {
             Name = name;
         }
 
-        public static CustomPolygon CreateRectangle(Point center)
+        // Статические методы создания предопределённых фигур
+        public static Polygon CreateRectangle(Point center)
         {
-            var f = new CustomPolygon(center, "Прямоугольник");
-            f.Sides.Add(new SideStyle(-50, -50));
-            f.Sides.Add(new SideStyle(50, -50));
-            f.Sides.Add(new SideStyle(50, 50));
-            f.Sides.Add(new SideStyle(-50, 50));
+            var f = new Polygon(center, "Прямоугольник");
+            f.Vertices = new List<PointF>
+            {
+                new PointF(-50, -50),
+                new PointF(50, -50),
+                new PointF(50, 50),
+                new PointF(-50, 50)
+            };
+            f.SyncSidesFromVertices();
             return f;
         }
 
-        public static CustomPolygon CreateTriangle(Point center)
+        public static Polygon CreateTriangle(Point center)
         {
-            var f = new CustomPolygon(center, "Треугольник");
-            f.Sides.Add(new SideStyle(0, -50));
-            f.Sides.Add(new SideStyle(45, 40));
-            f.Sides.Add(new SideStyle(-45, 40));
+            var f = new Polygon(center, "Треугольник");
+            f.Vertices = new List<PointF>
+            {
+                new PointF(0, -50),
+                new PointF(45, 40),
+                new PointF(-45, 40)
+            };
+            f.SyncSidesFromVertices();
             return f;
         }
 
-        public static CustomPolygon CreateTrapezium(Point center)
+        public static Polygon CreateTrapezium(Point center)
         {
-            var f = new CustomPolygon(center, "Трапеция");
-            f.Sides.Add(new SideStyle(-30, -30));
-            f.Sides.Add(new SideStyle(30, -30));
-            f.Sides.Add(new SideStyle(60, 30));
-            f.Sides.Add(new SideStyle(-60, 30));
+            var f = new Polygon(center, "Трапеция");
+            f.Vertices = new List<PointF>
+            {
+                new PointF(-30, -30),
+                new PointF(30, -30),
+                new PointF(60, 30),
+                new PointF(-60, 30)
+            };
+            f.SyncSidesFromVertices();
             return f;
         }
 
-        public static CustomPolygon CreatePentagon(Point center)
+        public static Polygon CreatePentagon(Point center)
         {
-            var f = new CustomPolygon(center, "Пятиугольник");
+            var f = new Polygon(center, "Пятиугольник");
+            f.Vertices = new List<PointF>();
             for (int i = 0; i < 5; i++)
             {
                 double angle = -Math.PI / 2 + i * 2 * Math.PI / 5;
-                f.Sides.Add(new SideStyle((int)(60 * Math.Cos(angle)), (int)(60 * Math.Sin(angle))));
+                f.Vertices.Add(new PointF((int)(60 * Math.Cos(angle)), (int)(60 * Math.Sin(angle))));
             }
+            f.SyncSidesFromVertices();
             return f;
+        }
+
+        // Синхронизация стилей с вершинами
+        private void SyncSidesFromVertices()
+        {
+            var oldStyles = Sides.ToList();
+            Sides.Clear();
+            for (int i = 0; i < Vertices.Count; i++)
+            {
+                SideStyle style;
+                if (i < oldStyles.Count)
+                    style = oldStyles[i].Clone();
+                else
+                    style = new SideStyle(Vertices[i].X, Vertices[i].Y) { Color = Color.Black, Thickness = 2.0f };
+                style.RelativeOffset = Vertices[i];
+                Sides.Add(style);
+            }
+        }
+
+        // Метод для сортировки вершин по часовой стрелке
+        public void SortVerticesClockwise()
+        {
+            if (Vertices.Count < 3) return;
+            float cx = Vertices.Average(v => v.X);
+            float cy = Vertices.Average(v => v.Y);
+            Vertices = Vertices.OrderBy(v => Math.Atan2(v.Y - cy, v.X - cx)).ToList();
+            SyncSidesFromVertices();
         }
 
         public PointF[] GetVertices()
         {
             float scale = Size / 100f;
-            return Sides.Select(s => new PointF(
-                Center.X + s.RelativeOffset.X * scale,
-                Center.Y + s.RelativeOffset.Y * scale
+            return Vertices.Select(v => new PointF(
+                Center.X + v.X * scale,
+                Center.Y + v.Y * scale
             )).ToArray();
         }
 
@@ -66,15 +115,13 @@ namespace Lab1.Shapes
         {
             var vertices = GetVertices();
             if (vertices.Length == 0) return new RectangleF(Center.X, Center.Y, 0, 0);
-
             float minX = vertices.Min(v => v.X);
             float minY = vertices.Min(v => v.Y);
             float maxX = vertices.Max(v => v.X);
             float maxY = vertices.Max(v => v.Y);
-
-            // ИСПРАВЛЕНИЕ: Оставляем только толщину самой линии, без искусственных +15
             float padding = MaxThickness / 2f;
-            return new RectangleF(minX - padding, minY - padding, (maxX - minX) + padding * 2, (maxY - minY) + padding * 2);
+            return new RectangleF(minX - padding, minY - padding,
+                                 (maxX - minX) + padding * 2, (maxY - minY) + padding * 2);
         }
 
         public override void Draw(Graphics g)
@@ -125,8 +172,10 @@ namespace Lab1.Shapes
                 }
                 else
                 {
-                    outer[i] = GetIntersect(pts[i], dirs[prev], normals[prev], halfThick[prev], dirs[curr], normals[curr], halfThick[curr], true);
-                    inner[i] = GetIntersect(pts[i], dirs[prev], normals[prev], halfThick[prev], dirs[curr], normals[curr], halfThick[curr], false);
+                    outer[i] = GetIntersect(pts[i], dirs[prev], normals[prev], halfThick[prev],
+                                            dirs[curr], normals[curr], halfThick[curr], true);
+                    inner[i] = GetIntersect(pts[i], dirs[prev], normals[prev], halfThick[prev],
+                                            dirs[curr], normals[curr], halfThick[curr], false);
                 }
             }
 
@@ -137,18 +186,16 @@ namespace Lab1.Shapes
                 using (var brush = new SolidBrush(Sides[i].Color))
                     g.FillPolygon(brush, quad);
 
-                // ИСПРАВЛЕНИЕ 3: Подсветка выбранной стороны в редакторе
                 if (Sides[i] == HighlightedSide)
                 {
                     using (Pen highlight = new Pen(Color.Cyan, 3) { DashStyle = DashStyle.Dash })
-                    {
                         g.DrawPolygon(highlight, quad);
-                    }
                 }
             }
         }
 
-        private PointF GetIntersect(PointF P, Vector2 d1, Vector2 n1, float h1, Vector2 d2, Vector2 n2, float h2, bool isOuter)
+        private PointF GetIntersect(PointF P, Vector2 d1, Vector2 n1, float h1,
+                                    Vector2 d2, Vector2 n2, float h2, bool isOuter)
         {
             float s = isOuter ? 1 : -1;
             Vector2 P1 = new Vector2(P.X, P.Y) + n1 * h1 * s;
@@ -176,19 +223,11 @@ namespace Lab1.Shapes
 
         public override Figure Clone()
         {
-            CustomPolygon clone = new CustomPolygon(new Point(this.BaseLocation.X, this.BaseLocation.Y), this.Name);
+            Polygon clone = new Polygon(new Point(this.BaseLocation.X, this.BaseLocation.Y), this.Name);
+            clone.Vertices = this.Vertices.Select(v => new PointF(v.X, v.Y)).ToList();
             this.CopyBaseProperties(clone);
+            clone.SyncSidesFromVertices();
             return clone;
-        }
-
-        public void SortVerticesClockwise()
-        {
-            if (Sides.Count < 3) return;
-            // Вычисляем центроид (среднюю точку)
-            float cx = Sides.Average(s => s.RelativeOffset.X);
-            float cy = Sides.Average(s => s.RelativeOffset.Y);
-            // Сортируем по углу относительно центроида
-            Sides = Sides.OrderBy(s => Math.Atan2(s.RelativeOffset.Y - cy, s.RelativeOffset.X - cx)).ToList();
         }
     }
 }

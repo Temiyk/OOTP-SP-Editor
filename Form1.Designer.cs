@@ -20,6 +20,24 @@ namespace Lab1
         private Button btnSave;
         private Button btnLoad;
 
+        //Button btnSaveSelected = new Button
+        //{
+        //    Text = "Сохранить выделенное",
+        //    Location = new Point(btnSave.Left, btnSave.Bottom + 5),
+        //    Size = btnSave.Size,
+        //    BackColor = Color.LightBlue
+        //};
+        //Button btnLoadAdd = new Button
+        //{
+        //    Text = "Добавить из файла",
+        //    Location = new Point(btnLoad.Left, btnLoad.Bottom + 5),
+        //    Size = btnLoad.Size,
+        //    BackColor = Color.LightCoral
+        //};
+
+        private Button btnSaveSelected;
+        private Button btnLoadAdd;
+
         private NumericUpDown nudAngle;
         private NumericUpDown nudLength;
         private Button btnAddPointByParams;
@@ -87,7 +105,7 @@ namespace Lab1
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Font = new Font("Segoe UI", 12F)
             };
-            cbShapeType.Items.AddRange(new object[] { "Прямоугольник", "Треугольник", "Круг", "Трапеция", "Пятиугольник" });
+            cbShapeType.Items.AddRange(new object[] { "Прямоугольник", "Треугольник", "Круг", "Эллипс", "Трапеция", "Пятиугольник" });
             cbShapeType.SelectedIndex = 0;
 
             btnAddShape = new Button
@@ -163,6 +181,21 @@ namespace Lab1
             btnLoad.ForeColor = Color.White;
             btnLoad.FlatAppearance.BorderSize = 0;
 
+            btnSaveSelected = new Button
+            {
+                Text = "Сохранить выделенное",
+                Location = new Point(1320, 16),
+                Size = new Size(190, 36),
+                BackColor = Color.FromArgb(0, 122, 204)
+            };
+            btnLoadAdd = new Button
+            {
+                Text = "Добавить из файла",
+                Location = new Point(1515, 16),
+                Size = new Size(190, 36),
+                BackColor = Color.FromArgb(0, 122, 204)
+            };
+
             toolbar.Controls.Add(cbShapeType);
             toolbar.Controls.Add(btnAddShape);
             toolbar.Controls.Add(btnClearAll);
@@ -171,6 +204,8 @@ namespace Lab1
             toolbar.Controls.Add(btnFullScreen);
             toolbar.Controls.Add(btnSave);
             toolbar.Controls.Add(btnLoad);
+            toolbar.Controls.Add(btnSaveSelected);
+            toolbar.Controls.Add(btnLoadAdd);
 
             canvasPanel = new DoubleBufferedPanel
             {

@@ -2,21 +2,24 @@
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using Newtonsoft.Json;
 
 namespace Lab1.Shapes
 {
     [Serializable]
     public abstract class Figure
     {
-        private static int _nextId = 1; // Счетчик для новых фигур
+        private static int _nextId = 1;
         public int Id { get; set; }
 
         public string Name { get; set; } = "Новая фигура";
-
         public int Size { get; set; } = 100;
         public Point BaseLocation { get; set; }
         public PointF RelativePivot { get; set; } = new PointF(0, 0);
+
+        [JsonIgnore]
         public SideStyle HighlightedSide { get; set; } = null;
+
         public Point Center
         {
             get => new Point(
@@ -32,8 +35,11 @@ namespace Lab1.Shapes
             }
         }
 
+        // Список стилей (контур для эллипса, рёбра для многоугольника)
         public List<SideStyle> Sides { get; set; } = new List<SideStyle>();
         public Color FillColor { get; set; } = Color.Transparent;
+
+        [JsonIgnore]
         public float MaxThickness => Sides.Count > 0 ? Sides.Max(s => s.Thickness) : 0;
 
         public Figure(Point center)
@@ -41,17 +47,20 @@ namespace Lab1.Shapes
             BaseLocation = center;
             Id = _nextId++;
         }
-
+        protected Figure() { }
         public abstract void Draw(Graphics g);
         public abstract bool Contains(Point p);
         public abstract RectangleF GetBounds();
         public abstract Figure Clone();
+
         public static void SetNextId(int value) => _nextId = value;
         public static int GetCurrentMaxId() => _nextId;
+
         public virtual void Move(int dx, int dy)
         {
             BaseLocation = new Point(BaseLocation.X + dx, BaseLocation.Y + dy);
         }
+
         protected void CopyBaseProperties(Figure clone)
         {
             clone.Name = this.Name;
