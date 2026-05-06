@@ -469,17 +469,30 @@ namespace Lab1
                 }
                 else if (e.Button == MouseButtons.Right && tempPoints.Count > 2)
                 {
+                    // 1. Берем первую точку как центр (опорную точку) фигуры
                     Point center = tempPoints[0];
                     var newPoly = new Polygon(center, "Нарисованная фигура");
+
+                    // 2. Наполняем список вершин (Vertices), а не сторон напрямую
+                    // Важно: координаты вершин должны быть относительными центра
                     foreach (var p in tempPoints)
                     {
-                        newPoly.Sides.Add(new SideStyle(p.X - center.X, p.Y - center.Y));
+                        newPoly.Vertices.Add(new PointF(p.X - center.X, p.Y - center.Y));
                     }
-                    newPoly.SortVerticesClockwise();   // упорядочивание вершин (см. пункт 3)
+
+                    // 3. Упорядочиваем вершины. 
+                    // Этот метод внутри сам вызовет SyncSidesFromVertices(), 
+                    // который создаст объекты SideStyle для отрисовки границ.
+                    newPoly.SortVerticesClockwise();
+
+                    // 4. Добавляем готовую фигуру на холст
                     figures.Add(newPoly);
+
+                    // 5. Очищаем временные данные и обновляем интерфейс
                     tempPoints.Clear();
-                    UpdateDrawingUI();   // скрыть элементы управления
+                    UpdateDrawingUI();
                     RefreshCanvas();
+                    UpdateListForm(); // Чтобы фигура появилась в списке
                 }
                 return;
             }
