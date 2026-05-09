@@ -442,12 +442,28 @@ namespace Lab1
                     foreach (var fig in selectedFigures)
                     {
                         var bounds = fig.GetBounds();
-                        // Строго по виртуальным границам фигуры
                         e.Graphics.DrawRectangle(selectPen, bounds.X, bounds.Y, bounds.Width, bounds.Height);
 
-                        // Точка центра фигуры (опционально для удобства)
                         using (Pen p = new Pen(Color.Red, 1) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash })
                             e.Graphics.DrawEllipse(p, fig.BaseLocation.X - 5, fig.BaseLocation.Y - 5, 10, 10);
+
+                        if (fig is Ellipse el)
+                        {
+                            // Вычисляем масштаб (по умолчанию 100% = 1.0)[cite: 1, 2]
+                            float scale = el.Size / 100f;
+
+                            // Пересчитываем относительные координаты фокусов в абсолютные координаты на экране[cite: 1, 2]
+                            // Мы берем Центр фигуры и добавляем к нему смещение фокуса, умноженное на масштаб[cite: 1, 2]
+                            PointF f1Abs = new PointF(el.Center.X + el.Focus1.X * scale, el.Center.Y + el.Focus1.Y * scale);
+                            PointF f2Abs = new PointF(el.Center.X + el.Focus2.X * scale, el.Center.Y + el.Focus2.Y * scale);
+
+                            // Рисуем синие точки размером 8x8 пикселей[cite: 6]
+                            using (Brush focusBrush = new SolidBrush(Color.Blue))
+                            {
+                                e.Graphics.FillEllipse(focusBrush, f1Abs.X - 4, f1Abs.Y - 4, 8, 8);
+                                e.Graphics.FillEllipse(focusBrush, f2Abs.X - 4, f2Abs.Y - 4, 8, 8);
+                            }
+                        }
                     }
                 }
             }
@@ -464,35 +480,27 @@ namespace Lab1
                 if (e.Button == MouseButtons.Left)
                 {
                     tempPoints.Add(e.Location);
-                    UpdateDrawingUI();   // Сразу активируем кнопку
+                    UpdateDrawingUI();   
                     RefreshCanvas();
                 }
                 else if (e.Button == MouseButtons.Right && tempPoints.Count > 2)
                 {
-                    // 1. Берем первую точку как центр (опорную точку) фигуры
                     Point center = tempPoints[0];
                     var newPoly = new Polygon(center, "Нарисованная фигура");
 
-                    // 2. Наполняем список вершин (Vertices), а не сторон напрямую
-                    // Важно: координаты вершин должны быть относительными центра
                     foreach (var p in tempPoints)
                     {
                         newPoly.Vertices.Add(new PointF(p.X - center.X, p.Y - center.Y));
                     }
 
-                    // 3. Упорядочиваем вершины. 
-                    // Этот метод внутри сам вызовет SyncSidesFromVertices(), 
-                    // который создаст объекты SideStyle для отрисовки границ.
                     newPoly.SortVerticesClockwise();
 
-                    // 4. Добавляем готовую фигуру на холст
                     figures.Add(newPoly);
 
-                    // 5. Очищаем временные данные и обновляем интерфейс
                     tempPoints.Clear();
                     UpdateDrawingUI();
                     RefreshCanvas();
-                    UpdateListForm(); // Чтобы фигура появилась в списке
+                    UpdateListForm();
                 }
                 return;
             }

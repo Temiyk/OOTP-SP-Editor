@@ -27,6 +27,10 @@ namespace Lab1
         private Label lblRadiusX, lblRadiusY, lblAngle;
         private Label lblSides, lblSideColor, lblThick, lblSideRel, lblSideLength;
         private Button btnSideColor;
+        private Button btnApply;
+
+        private TextBox txtFocus1X, txtFocus1Y, txtFocus2X, txtFocus2Y, txtDistanceSum;
+        private Label lblFocus1, lblFocus2, lblDistanceSum;
 
         private List<SideStyle> flatSides = new List<SideStyle>();
 
@@ -149,17 +153,27 @@ namespace Lab1
 
             // --- Специфические элементы для эллипса ---
             y = ySpecificStart;
-            lblRadiusX = AddLabel("Радиус X:", ref y);
-            txtRadiusX = AddTextBox(ref y, elementWidth);
-            lblRadiusY = AddLabel("Радиус Y:", ref y);
-            txtRadiusY = AddTextBox(ref y, elementWidth);
-            lblAngle = AddLabel("Угол поворота (градусы):", ref y);
-            txtAngle = AddTextBox(ref y, elementWidth);
+            lblFocus1 = AddLabel("Фокус 1 (X, Y):", ref y);
+            txtFocus1X = AddTextBox(ref y, elementWidth / 2 - 5);
+            txtFocus1Y = AddTextBox(ref y, elementWidth / 2 - 5);
+            txtFocus1Y.Location = new Point(txtFocus1X.Right + 10, txtFocus1X.Top); y -= 40; // Ставим поля рядом
+
+            lblFocus2 = AddLabel("Фокус 2 (X, Y):", ref y);
+            txtFocus2X = AddTextBox(ref y, elementWidth / 2 - 5);
+            txtFocus2Y = AddTextBox(ref y, elementWidth / 2 - 5);
+            txtFocus2Y.Location = new Point(txtFocus2X.Right + 10, txtFocus2X.Top); y -= 40;
+
+            lblDistanceSum = AddLabel("Сумма расстояний (2a):", ref y);
+            txtDistanceSum = AddTextBox(ref y, elementWidth);
 
             int yAfterEllipse = y;
             y = Math.Max(yAfterPoly, yAfterEllipse);
 
-            // Кнопка удаления
+            btnApply = new Button { Text = "Применить изменения", Location = new Point(10, y + 10), Size = new Size(elementWidth, 40), BackColor = Color.LightGreen };
+            btnApply.Click += AutoApply; 
+            this.Controls.Add(btnApply);
+            y += 50; 
+
             Button btnDel = new Button { Text = "Удалить фигуру", Location = new Point(10, y + 10), Size = new Size(elementWidth, 45), BackColor = Color.MistyRose };
             btnDel.Click += (s, e) =>
             {
@@ -170,20 +184,6 @@ namespace Lab1
                 this.Close();
             };
             this.Controls.Add(btnDel);
-
-            // Подписки на авто‑применение
-            txtCX.TextChanged += AutoApply;
-            txtCY.TextChanged += AutoApply;
-            txtRelX.TextChanged += AutoApply;
-            txtRelY.TextChanged += AutoApply;
-            txtScale.TextChanged += AutoApply;
-            txtRadiusX.TextChanged += AutoApply;
-            txtRadiusY.TextChanged += AutoApply;
-            txtAngle.TextChanged += AutoApply;
-            txtThick.TextChanged += AutoApply;
-            txtSideRelX.TextChanged += AutoApply;
-            txtSideRelY.TextChanged += AutoApply;
-            txtSideLength.TextChanged += AutoApply;
         }
 
         private Label AddLabel(string text, ref int y)
@@ -234,11 +234,13 @@ namespace Lab1
         {
             isUpdatingUI = true;
 
+            // Базовая информация об объекте[cite: 6]
             txtId.Text = targetFigure.Id.ToString().ToUpper();
             txtFigureName.Text = targetFigure.Name;
 
-            UpdateBoundsLabel();
+            UpdateBoundsLabel(); // Обновляем текст с границами[cite: 6]
 
+            // Заполняем общие координаты[cite: 6]
             txtCX.Text = targetFigure.BaseLocation.X.ToString();
             txtCY.Text = targetFigure.BaseLocation.Y.ToString();
             txtRelX.Text = targetFigure.RelativePivot.X.ToString();
@@ -251,23 +253,25 @@ namespace Lab1
 
             bool isEllipse = targetFigure is Ellipse;
 
-            lblRadiusX.Visible = txtRadiusX.Visible = isEllipse;
-            lblRadiusY.Visible = txtRadiusY.Visible = isEllipse;
-            lblAngle.Visible = txtAngle.Visible = isEllipse;
+            // Управление видимостью полей для ЭЛЛИПСА[cite: 1, 6]
+            lblFocus1.Visible = txtFocus1X.Visible = txtFocus1Y.Visible = isEllipse;
+            lblFocus2.Visible = txtFocus2X.Visible = txtFocus2Y.Visible = isEllipse;
+            lblDistanceSum.Visible = txtDistanceSum.Visible = isEllipse;
 
+            // Управление видимостью полей для МНОГОУГОЛЬНИКА (Прямоугольника)[cite: 3, 6]
             lblSides.Visible = cbSides.Visible = !isEllipse;
             lblSideRel.Visible = txtSideRelX.Visible = txtSideRelY.Visible = !isEllipse;
             lblSideLength.Visible = txtSideLength.Visible = !isEllipse;
 
-            lblSideColor.Visible = pnlSideColor.Visible = btnSideColor.Visible = true;
-            lblThick.Visible = txtThick.Visible = true;
-
             if (isEllipse)
             {
                 Ellipse ellipse = (Ellipse)targetFigure;
-                txtRadiusX.Text = ellipse.RadiusX.ToString();
-                txtRadiusY.Text = ellipse.RadiusY.ToString();
-                txtAngle.Text = Math.Round(ellipse.Angle, 1).ToString();
+                // Загружаем данные фокусов[cite: 1]
+                txtFocus1X.Text = ellipse.Focus1.X.ToString();
+                txtFocus1Y.Text = ellipse.Focus1.Y.ToString();
+                txtFocus2X.Text = ellipse.Focus2.X.ToString();
+                txtFocus2Y.Text = ellipse.Focus2.Y.ToString();
+                txtDistanceSum.Text = ellipse.DistanceSum.ToString();
 
                 if (ellipse.Sides.Count > 0)
                 {
@@ -277,11 +281,13 @@ namespace Lab1
             }
             else
             {
+                // Если это прямоугольник или другой многоугольник, загружаем его стороны[cite: 3, 6]
                 PopulateSides(targetFigure, "");
             }
 
             isUpdatingUI = false;
 
+            // Если есть стороны, выбираем первую для редактирования[cite: 6]
             if (cbSides.Items.Count > 0 && !isEllipse) cbSides.SelectedIndex = 0;
         }
 
@@ -361,6 +367,23 @@ namespace Lab1
                 Point oldVisualCenter = targetFigure.Center;
                 bool isBaseLocationChangedManually = (newBaseLocation != targetFigure.BaseLocation);
 
+                if (targetFigure.RelativePivot != newRelativePivot)
+                {
+                    Point oldCenter = targetFigure.Center; // Запоминаем текущий визуальный центр
+                    targetFigure.RelativePivot = newRelativePivot; // Меняем привязку
+                    targetFigure.Center = oldCenter; // Возвращаем центр на место (BaseLocation обновится автоматически)
+
+                    // Обновляем текстовые поля новыми значениями BaseLocation
+                    txtCX.Text = targetFigure.BaseLocation.X.ToString();
+                    txtCY.Text = targetFigure.BaseLocation.Y.ToString();
+                }
+                // Иначе, если пользователь вручную ввел новые координаты базы:
+                else if (targetFigure.BaseLocation != newBaseLocation)
+                {
+                    targetFigure.BaseLocation = newBaseLocation;
+                }
+
+
                 targetFigure.RelativePivot = newRelativePivot;
                 if (isBaseLocationChangedManually) targetFigure.BaseLocation = newBaseLocation;
                 else targetFigure.Center = oldVisualCenter;
@@ -370,22 +393,32 @@ namespace Lab1
 
                 if (targetFigure is Ellipse el)
                 {
-                    float a = float.Parse(txtRadiusX.Text);
-                    float b = float.Parse(txtRadiusY.Text);
-                    float angle = float.Parse(txtAngle.Text);
+                    // 1. Сначала запоминаем ТЕКУЩИЙ вертикальный радиус (высоту), 
+                    // чтобы он не «схлопнулся» при расчетах
+                    float currentB = el.RadiusY;
 
-                    float maxR = Math.Max(a, b);
-                    float minR = Math.Min(a, b);
+                    // 2. Считываем новые координаты фокусов из текстовых полей
+                    PointF newF1 = new PointF(float.Parse(txtFocus1X.Text), float.Parse(txtFocus1Y.Text));
+                    PointF newF2 = new PointF(float.Parse(txtFocus2X.Text), float.Parse(txtFocus2Y.Text));
 
-                    if (b > a) angle += 90;
+                    // 3. Вычисляем новое расстояние между фокусами (2c)[cite: 1]
+                    float dx = newF2.X - newF1.X;
+                    float dy = newF2.Y - newF1.Y;
+                    float newC = (float)Math.Sqrt(dx * dx + dy * dy) / 2f;
 
-                    float c = (float)Math.Sqrt(Math.Max(0, maxR * maxR - minR * minR));
-                    double rad = angle * Math.PI / 180.0;
+                    // 4. Вычисляем новую большую полуось (a), которая сохранит высоту (currentB)[cite: 1]
+                    // Используем формулу: a = sqrt(b^2 + c^2)
+                    float newA = (float)Math.Sqrt(currentB * currentB + newC * newC);
 
-                    el.Focus1 = new PointF((float)(-c * Math.Cos(rad)), (float)(-c * Math.Sin(rad)));
-                    el.Focus2 = new PointF((float)(c * Math.Cos(rad)), (float)(c * Math.Sin(rad)));
-                    el.DistanceSum = maxR * 2;
+                    // 5. Применяем обновленные параметры к эллипсу[cite: 1]
+                    el.Focus1 = newF1;
+                    el.Focus2 = newF2;
+                    el.DistanceSum = newA * 2f; // Автоматически корректируем сумму расстояний
 
+                    // 6. Обновляем текстовое поле суммы расстояний, чтобы пользователь видел изменения
+                    txtDistanceSum.Text = el.DistanceSum.ToString();
+
+                    // Применяем настройки контура (цвет и толщину)[cite: 6, 1]
                     if (el.Sides.Count > 0)
                     {
                         el.Sides[0].Color = pnlSideColor.BackColor;
